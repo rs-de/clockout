@@ -38,3 +38,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 11. Wire encryption to TrackingData: encrypt/decrypt whole document
     `(add app/utils/tracking-document.ts + test/tracking-document.test.ts)`
+
+12. Local IndexedDB persistence for TrackingData (decrypted, durable write-buffer)
+    `(pnpm add -D fake-indexeddb; add app/utils/local-store.ts + tests)`

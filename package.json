@@ -21,6 +21,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.3",
 		"@types/node": "26.1.1",
+		"fake-indexeddb": "^6.2.5",
 		"typescript": "7.0.2"
 	}
 }
