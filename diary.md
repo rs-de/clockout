@@ -41,3 +41,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 12. Local IndexedDB persistence for TrackingData (decrypted, durable write-buffer)
     `(pnpm add -D fake-indexeddb; add app/utils/local-store.ts + tests)`
+
+13. Setup + tracking screens; plain CSS (no CSS-in-JS); widen asset allowlist
+    `(add app/ui/app.tsx, app/assets/app.css; fix SSR-crashing setInterval)`

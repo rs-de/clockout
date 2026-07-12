@@ -5,6 +5,7 @@ import {
 	createTrackingData,
 	DEFAULT_DAILY_MAX,
 	DEFAULT_WEEKLY_TARGET_MIN,
+	formatDuration,
 	isRunning,
 	startOfWeek,
 	summarize,
@@ -13,6 +14,24 @@ import {
 } from "../app/utils/time-tracking.ts"
 
 const H = 3600
+
+describe("formatDuration", () => {
+	test("formats whole hours and minutes", () => {
+		assert.equal(formatDuration(9 * H + 55 * 60), "9h 55m")
+	})
+
+	test("pads single-digit minutes", () => {
+		assert.equal(formatDuration(1 * H + 5 * 60), "1h 05m")
+	})
+
+	test("prefixes a negative sign when over", () => {
+		assert.equal(formatDuration(-15 * 60), "-0h 15m")
+	})
+
+	test("formats zero", () => {
+		assert.equal(formatDuration(0), "0h 00m")
+	})
+})
 
 describe("createTrackingData", () => {
 	test("generates a unique id and applies default settings", () => {

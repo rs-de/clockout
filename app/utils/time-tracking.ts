@@ -94,6 +94,15 @@ export function workedSecondsInRange(
 	return total
 }
 
+/** e.g. `-0h 15m` for 15 minutes over. */
+export function formatDuration(totalSeconds: number): string {
+	const sign = totalSeconds < 0 ? "-" : ""
+	const abs = Math.round(Math.abs(totalSeconds))
+	const h = Math.floor(abs / 3600)
+	const m = Math.floor((abs % 3600) / 60)
+	return `${sign}${h}h ${String(m).padStart(2, "0")}m`
+}
+
 function overlapSeconds(
 	start: number,
 	end: number,

@@ -1,0 +1,51 @@
+:root {
+	--color-bg: #ffffff;
+	--color-text: #111111;
+	--color-border: #d0d7de;
+	--color-start: #1a7f37;
+	--color-start-hover: #156c2e;
+	--color-stop: #cf222e;
+	--color-stop-hover: #a91e28;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--color-bg: #0d1117;
+		--color-text: #e6edf3;
+		--color-border: #30363d;
+	}
+}
+
+body {
+	margin: 0;
+	background: var(--color-bg);
+	color: var(--color-text);
+	font-family: system-ui, sans-serif;
+}
+
+.toggle-button {
+	min-width: 44px;
+	min-height: 44px;
+	padding: var(--space-3) var(--space-4);
+	border: none;
+	border-radius: 6px;
+	color: white;
+	background-color: var(--color-start);
+	font-size: 1rem;
+	cursor: pointer;
+}
+
+.toggle-button:hover {
+	background-color: var(--color-start-hover);
+}
+
+.toggle-button[data-running="true"] {
+	background-color: var(--color-stop);
+}
+
+.toggle-button[data-running="true"]:hover {
+	background-color: var(--color-stop-hover);
+}

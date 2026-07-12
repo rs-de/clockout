@@ -2,6 +2,7 @@ import { createController } from "remix/router"
 
 import { assetServer } from "../assets.ts"
 import { routes } from "../routes.ts"
+import { App } from "../ui/app.tsx"
 import { Document } from "../ui/document.tsx"
 
 export default createController(routes, {
@@ -15,7 +16,7 @@ export default createController(routes, {
 		home(context) {
 			return context.render(
 				<Document>
-					<h1>Hello World</h1>
+					<App />
 				</Document>,
 			)
 		},

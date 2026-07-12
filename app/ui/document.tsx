@@ -1,5 +1,4 @@
 import type { Handle, RemixNode } from "remix/ui"
-import { css } from "remix/ui"
 
 import { routes } from "../routes.ts"
 
@@ -21,10 +20,14 @@ export function Document(handle: Handle<DocumentProps>) {
 					<meta charSet="utf-8" />
 					<meta name="viewport" content="width=device-width, initial-scale=1" />
 					<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+					<link
+						rel="stylesheet"
+						href={routes.assets.href({ path: "app/assets/app.css" })}
+					/>
 					<title>{title}</title>
 					{head}
 				</head>
-				<body mix={css({ margin: 0 })}>
+				<body>
 					{children}
 					<script
 						type="module"
