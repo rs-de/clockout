@@ -1,3 +1,5 @@
+import { nanoid } from "nanoid"
+
 export type TimeEventType = "start" | "stop"
 
 export type TimeEvent = {
@@ -8,12 +10,23 @@ export type TimeEvent = {
 
 export type TrackingSettings = {
 	weeklyTargetMin: number
-	dailyMaxMin: number
+	dailyMax: number
 }
 
 export type TrackingData = {
+	/** Identifies this history document as a whole, e.g. as a server resource key. */
+	id: string
 	settings: TrackingSettings
 	events: TimeEvent[]
+}
+
+export function createTrackingData(
+	settings: TrackingSettings = {
+		weeklyTargetMin: DEFAULT_WEEKLY_TARGET_MIN,
+		dailyMax: DEFAULT_DAILY_MAX,
+	},
+): TrackingData {
+	return { id: nanoid(), settings, events: [] }
 }
 
 export type TrackingSummary = {
@@ -25,7 +38,7 @@ export type TrackingSummary = {
 }
 
 export const DEFAULT_WEEKLY_TARGET_MIN = 35 * 60
-export const DEFAULT_DAILY_MAX_MIN = 9 * 60 + 55
+export const DEFAULT_DAILY_MAX = 9 * 60 + 55
 
 export function startOfDay(date: Date): Date {
 	const d = new Date(date)
@@ -117,7 +130,7 @@ export function summarize(
 	return {
 		isRunning: isRunning(data.events),
 		dailyWorkedSec,
-		dailyRemainingSec: data.settings.dailyMaxMin * 60 - dailyWorkedSec,
+		dailyRemainingSec: data.settings.dailyMax * 60 - dailyWorkedSec,
 		weeklyWorkedSec,
 		weeklyRemainingSec: data.settings.weeklyTargetMin * 60 - weeklyWorkedSec,
 	}

@@ -2,6 +2,9 @@ import assert from "node:assert/strict"
 import { describe, test } from "node:test"
 
 import {
+	createTrackingData,
+	DEFAULT_DAILY_MAX,
+	DEFAULT_WEEKLY_TARGET_MIN,
 	isRunning,
 	startOfWeek,
 	summarize,
@@ -10,6 +13,18 @@ import {
 } from "../app/utils/time-tracking.ts"
 
 const H = 3600
+
+describe("createTrackingData", () => {
+	test("generates a unique id and applies default settings", () => {
+		const a = createTrackingData()
+		const b = createTrackingData()
+
+		assert.notEqual(a.id, b.id)
+		assert.equal(a.settings.weeklyTargetMin, DEFAULT_WEEKLY_TARGET_MIN)
+		assert.equal(a.settings.dailyMax, DEFAULT_DAILY_MAX)
+		assert.deepEqual(a.events, [])
+	})
+})
 
 describe("isRunning", () => {
 	test("false with no events", () => {
@@ -114,7 +129,8 @@ describe("startOfWeek", () => {
 describe("summarize", () => {
 	test("computes daily and weekly remaining time from events", () => {
 		const data: TrackingData = {
-			settings: { weeklyTargetMin: 35 * 60, dailyMaxMin: 9 * 60 + 55 },
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
 			events: [
 				{ t: 0, type: "start" },
 				{ t: 4 * H, type: "stop" },
@@ -131,7 +147,8 @@ describe("summarize", () => {
 
 	test("reflects an in-progress session live via `now`", () => {
 		const data: TrackingData = {
-			settings: { weeklyTargetMin: 35 * 60, dailyMaxMin: 9 * 60 + 55 },
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
 			events: [{ t: 0, type: "start" }],
 		}
 		const summary = summarize(data, new Date(1 * H * 1000))

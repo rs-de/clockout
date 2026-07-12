@@ -29,3 +29,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 8. Fix requirements.md numbering, translate to English
    `(edit requirements.md: renumber duplicate "1)", fix typos, translate)`
+
+9. Add nanoid document id to TrackingData (whole history resource, not per-event)
+   `(pnpm add nanoid; add id + createTrackingData(); dailyMaxMin -> dailyMax)`

@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      nanoid:
+        specifier: ^6.0.0
+        version: 6.0.0
       remix:
         specifier: ^3.0.0-beta.5
         version: 3.0.0-beta.5(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
@@ -1129,6 +1132,11 @@ packages:
     resolution: {integrity: sha512-hXdUTZYIVOt1Ex//jAQi+wTZZpUpwBj/0QsOzqegb3rGMMeJiSEu5xLHnYfBrRV4RH2+OCSOO95Is/7x1WJ4bw==}
     engines: {node: '>=10'}
 
+  nanoid@6.0.0:
+    resolution: {integrity: sha512-mkUH+rPkwU2qPadJ0oJZOjeZ5Mxn8Q1UhevwkTRWNuUZzyia3h4rhzK39hxaHTk0o2OxB8W2SQ6A8k23ZDi1pQ==}
+    engines: {node: ^22 || ^24 || >=26}
+    hasBin: true
+
   oxc-minify@0.121.0:
     resolution: {integrity: sha512-XziD0au8etayM2zJnqcSiW+Pn3hEpqHsbwfL7G4Ej0SwqfvbIjiEF1/uNqONuHl0n9LkLI1ez378vSWZRJZWAQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -2019,6 +2027,8 @@ snapshots:
   make-dir@4.0.0:
     dependencies:
       semver: 7.8.5
+
+  nanoid@6.0.0: {}
 
   oxc-minify@0.121.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2):
     optionalDependencies:
