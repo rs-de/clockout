@@ -1,21 +1,25 @@
 {
-  "name": "clockout",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
-    "start": "NODE_ENV=production node --import remix/node-tsx server.ts",
-    "test": "NODE_ENV=test node --import remix/node-tsx --test",
-    "typecheck": "tsc --noEmit"
-  },
-  "engines": {
-    "node": ">=24.3.0"
-  },
-  "dependencies": {
-    "remix": "^3.0.0-beta.5"
-  },
-  "devDependencies": {
-    "@types/node": "latest",
-    "typescript": "latest"
-  }
+	"name": "clockout",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
+		"start": "NODE_ENV=production node --import remix/node-tsx server.ts",
+		"test": "NODE_ENV=test node --import remix/node-tsx --test",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"lint": "biome lint --write .",
+		"check": "biome check --write ."
+	},
+	"engines": {
+		"node": ">=24"
+	},
+	"dependencies": {
+		"remix": "^3.0.0-beta.5"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.3",
+		"@types/node": "26.1.1",
+		"typescript": "7.0.2"
+	}
 }
