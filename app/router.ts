@@ -2,6 +2,7 @@ import { staticFiles } from "remix/middleware/static"
 import { createRouter, type MiddlewareContext } from "remix/router"
 
 import controller from "./actions/controller.tsx"
+import syncController from "./actions/sync/controller.tsx"
 import { render } from "./middleware/render.tsx"
 import { routes } from "./routes.ts"
 
@@ -18,3 +19,4 @@ export const router = createRouter<AppContext>({
 })
 
 router.map(routes, controller)
+router.map(routes.sync, syncController)

@@ -1,4 +1,11 @@
-import { decrypt, deriveKey, encrypt, randomSalt } from "./crypto.ts"
+import {
+	decrypt,
+	deriveKey,
+	encrypt,
+	fromBase64,
+	randomSalt,
+	toBase64,
+} from "./crypto.ts"
 import type { TrackingData } from "./time-tracking.ts"
 
 /**
@@ -37,4 +44,34 @@ export async function decryptTrackingData(
 	const plaintext = await decrypt(doc.ciphertext, doc.iv, key)
 	const payload = JSON.parse(plaintext) as TrackingPayload
 	return { id: doc.id, settings: payload.settings, events: payload.events }
+}
+
+/** JSON-safe wire/storage form of an EncryptedTrackingDocument. */
+export type SerializedEncryptedDocument = {
+	id: string
+	salt: string
+	iv: string
+	ciphertext: string
+}
+
+export function serializeEncryptedDocument(
+	doc: EncryptedTrackingDocument,
+): SerializedEncryptedDocument {
+	return {
+		id: doc.id,
+		salt: toBase64(doc.salt),
+		iv: toBase64(doc.iv),
+		ciphertext: toBase64(doc.ciphertext),
+	}
+}
+
+export function deserializeEncryptedDocument(
+	doc: SerializedEncryptedDocument,
+): EncryptedTrackingDocument {
+	return {
+		id: doc.id,
+		salt: fromBase64(doc.salt),
+		iv: fromBase64(doc.iv),
+		ciphertext: fromBase64(doc.ciphertext),
+	}
 }

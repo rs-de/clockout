@@ -47,3 +47,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 14. Persist browser-verification recipe learned while checking step 13
     `(add .claude/skills/verify/SKILL.md: launch/drive steps, gotchas)`
+
+15. Server-side sync storage for encrypted documents (no crypto server-side)
+    `(add app/data/sync-store.server.ts, /sync/:id GET+PUT route+controller)`
