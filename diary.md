@@ -26,3 +26,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 7. Event-log types + pure Tages-/Wochen-Restzeit calculation utilities
    `(add app/utils/time-tracking.ts + test/time-tracking.test.ts)`
+
+8. Fix requirements.md numbering, translate to English
+   `(edit requirements.md: renumber duplicate "1)", fix typos, translate)`
