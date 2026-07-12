@@ -44,3 +44,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 13. Setup + tracking screens; plain CSS (no CSS-in-JS); widen asset allowlist
     `(add app/ui/app.tsx, app/assets/app.css; fix SSR-crashing setInterval)`
+
+14. Persist browser-verification recipe learned while checking step 13
+    `(add .claude/skills/verify/SKILL.md: launch/drive steps, gotchas)`
