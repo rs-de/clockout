@@ -23,3 +23,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 6. Add CLAUDE.md with diary workflow, fix AGENTS.md commands
    `(create CLAUDE.md, update AGENTS.md npm -> pnpm)`
+
+7. Event-log types + pure Tages-/Wochen-Restzeit calculation utilities
+   `(add app/utils/time-tracking.ts + test/time-tracking.test.ts)`
