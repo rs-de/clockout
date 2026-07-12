@@ -14,6 +14,7 @@
 	"engines": {
 		"node": ">=24"
 	},
+	"packageManager": "pnpm@10.6.2",
 	"dependencies": {
 		"nanoid": "^6.0.0",
 		"remix": "^3.0.0-beta.5"

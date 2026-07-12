@@ -56,3 +56,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 17. Recovery flow: bookmarkable /d/:id, unlock screen after storage cleared
     `(add doc route+action, unlock view, history.replaceState on setup)`
+
+18. Fly.io deploy config (single host, volume-backed sync store)
+    `(add Dockerfile, .dockerignore, fly.toml; pin packageManager)`
