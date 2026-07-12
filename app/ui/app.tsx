@@ -9,16 +9,26 @@ import {
 	type TrackingData,
 } from "../utils/time-tracking.ts"
 import {
+	decryptTrackingData,
+	deserializeEncryptedDocument,
 	encryptTrackingData,
+	type SerializedEncryptedDocument,
 	serializeEncryptedDocument,
 } from "../utils/tracking-document.ts"
 
 type View =
 	| { kind: "loading" }
 	| { kind: "setup" }
+	| { kind: "unlock"; id: string; error?: string }
 	| { kind: "tracking"; data: TrackingData }
 
 type SyncStatus = "idle" | "syncing" | "synced" | "error"
+
+const DOC_URL_PATTERN = /^\/d\/([A-Za-z0-9_-]+)$/
+
+function readDocIdFromUrl(): string | null {
+	return DOC_URL_PATTERN.exec(window.location.pathname)?.[1] ?? null
+}
 
 function readMinutes(
 	formData: FormData,
@@ -57,7 +67,12 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 	handle.queueTask(async (signal) => {
 		const data = await loadTrackingData()
 		if (signal.aborted) return
-		view = data ? { kind: "tracking", data } : { kind: "setup" }
+		if (data) {
+			view = { kind: "tracking", data }
+		} else {
+			const id = readDocIdFromUrl()
+			view = id ? { kind: "unlock", id } : { kind: "setup" }
+		}
 		handle.update()
 	})
 
@@ -94,7 +109,31 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		sessionPassword = password
 		view = { kind: "tracking", data }
 		handle.update()
+		// Makes the URL bookmarkable so it can be used to recover this
+		// document later if local storage gets cleared.
+		window.history.replaceState(null, "", `/d/${data.id}`)
 		void syncToServer(data, sessionPassword)
+	}
+
+	async function handleUnlockSubmit(id: string, unlockPassword: string) {
+		const response = await fetch(`/sync/${encodeURIComponent(id)}`)
+		if (!response.ok) {
+			view = { kind: "unlock", id, error: "No data found for this link." }
+			handle.update()
+			return
+		}
+
+		const serialized = (await response.json()) as SerializedEncryptedDocument
+		const doc = deserializeEncryptedDocument(serialized)
+		try {
+			const data = await decryptTrackingData(doc, unlockPassword)
+			await saveTrackingData(data)
+			sessionPassword = unlockPassword
+			view = { kind: "tracking", data }
+		} catch {
+			view = { kind: "unlock", id, error: "Wrong password." }
+		}
+		handle.update()
 	}
 
 	async function handleToggle(data: TrackingData) {
@@ -109,6 +148,34 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 
 	return () => {
 		if (view.kind === "loading") return <p>Loading...</p>
+
+		if (view.kind === "unlock") {
+			const { id, error } = view
+
+			return (
+				<form
+					mix={on("submit", (event) => {
+						event.preventDefault()
+						const formData = new FormData(event.currentTarget)
+						void handleUnlockSubmit(id, String(formData.get("password") ?? ""))
+					})}
+				>
+					<h1>clockout</h1>
+					<p>This browser doesn't have local data for this link.</p>
+					<label>
+						Password
+						<input
+							name="password"
+							type="password"
+							autoComplete="current-password"
+							required
+						/>
+					</label>
+					{error && <p role="alert">{error}</p>}
+					<button type="submit">Unlock</button>
+				</form>
+			)
+		}
 
 		if (view.kind === "setup") {
 			const passwordsMatch = password.length > 0 && password === passwordRepeat

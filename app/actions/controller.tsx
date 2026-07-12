@@ -20,5 +20,12 @@ export default createController(routes, {
 				</Document>,
 			)
 		},
+		doc(context) {
+			return context.render(
+				<Document>
+					<App />
+				</Document>,
+			)
+		},
 	},
 })

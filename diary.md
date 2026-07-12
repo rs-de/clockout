@@ -53,3 +53,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 16. Wire client to push encrypted syncs after setup/toggle; show sync status
     `(edit app/ui/app.tsx: session-scoped password, fetch PUT /sync/:id)`
+
+17. Recovery flow: bookmarkable /d/:id, unlock screen after storage cleared
+    `(add doc route+action, unlock view, history.replaceState on setup)`
