@@ -35,3 +35,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 10. Password-derived encryption (PBKDF2 -> AES-GCM) via Web Crypto
     `(add app/utils/crypto.ts + test/crypto.test.ts)`
+
+11. Wire encryption to TrackingData: encrypt/decrypt whole document
+    `(add app/utils/tracking-document.ts + test/tracking-document.test.ts)`
