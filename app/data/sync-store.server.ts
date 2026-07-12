@@ -10,7 +10,8 @@ import type { SerializedEncryptedDocument } from "../utils/tracking-document.ts"
  */
 export function createSyncStore(dataDir: string) {
 	function fileFor(id: string): string {
-		if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`Invalid document id: ${id}`)
+		if (!/^[A-Za-z0-9_-]+$/.test(id))
+			throw new Error(`Invalid document id: ${id}`)
 		return path.join(dataDir, `${id}.json`)
 	}
 

@@ -50,3 +50,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 15. Server-side sync storage for encrypted documents (no crypto server-side)
     `(add app/data/sync-store.server.ts, /sync/:id GET+PUT route+controller)`
+
+16. Wire client to push encrypted syncs after setup/toggle; show sync status
+    `(edit app/ui/app.tsx: session-scoped password, fetch PUT /sync/:id)`

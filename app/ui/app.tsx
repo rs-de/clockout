@@ -8,11 +8,17 @@ import {
 	summarize,
 	type TrackingData,
 } from "../utils/time-tracking.ts"
+import {
+	encryptTrackingData,
+	serializeEncryptedDocument,
+} from "../utils/tracking-document.ts"
 
 type View =
 	| { kind: "loading" }
 	| { kind: "setup" }
 	| { kind: "tracking"; data: TrackingData }
+
+type SyncStatus = "idle" | "syncing" | "synced" | "error"
 
 function readMinutes(
 	formData: FormData,
@@ -24,10 +30,29 @@ function readMinutes(
 	return hours * 60 + minutes
 }
 
+function syncStatusLabel(status: SyncStatus): string | null {
+	switch (status) {
+		case "syncing":
+			return "Syncing..."
+		case "synced":
+			return "Synced"
+		case "error":
+			return "Sync failed (offline?)"
+		case "idle":
+			return null
+	}
+}
+
 export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 	let view: View = { kind: "loading" }
 	let password = ""
 	let passwordRepeat = ""
+
+	// Set once setup succeeds; kept in memory for the rest of this page load
+	// only (never persisted). A reload that finds data already in local
+	// storage never needs it — see requirement #4.
+	let sessionPassword: string | null = null
+	let syncStatus: SyncStatus = "idle"
 
 	handle.queueTask(async (signal) => {
 		const data = await loadTrackingData()
@@ -43,14 +68,33 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		handle.signal.addEventListener("abort", () => clearInterval(interval))
 	}
 
+	async function syncToServer(data: TrackingData, password: string) {
+		syncStatus = "syncing"
+		handle.update()
+		try {
+			const doc = await encryptTrackingData(data, password)
+			const response = await fetch(`/sync/${encodeURIComponent(data.id)}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(serializeEncryptedDocument(doc)),
+			})
+			syncStatus = response.ok ? "synced" : "error"
+		} catch {
+			syncStatus = "error"
+		}
+		handle.update()
+	}
+
 	async function handleSetupSubmit(formData: FormData) {
 		const data = createTrackingData({
 			weeklyTargetMin: readMinutes(formData, "weeklyHours", "weeklyMinutes"),
 			dailyMax: readMinutes(formData, "dailyHours", "dailyMinutes"),
 		})
 		await saveTrackingData(data)
+		sessionPassword = password
 		view = { kind: "tracking", data }
 		handle.update()
+		void syncToServer(data, sessionPassword)
 	}
 
 	async function handleToggle(data: TrackingData) {
@@ -60,6 +104,7 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		})
 		await saveTrackingData(data)
 		handle.update()
+		if (sessionPassword) void syncToServer(data, sessionPassword)
 	}
 
 	return () => {
@@ -156,6 +201,9 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 				>
 					{summary.isRunning ? "Stop" : "Start"}
 				</button>
+				{syncStatusLabel(syncStatus) && (
+					<p role="status">{syncStatusLabel(syncStatus)}</p>
+				)}
 			</div>
 		)
 	}
