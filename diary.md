@@ -32,3 +32,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 9. Add nanoid document id to TrackingData (whole history resource, not per-event)
    `(pnpm add nanoid; add id + createTrackingData(); dailyMaxMin -> dailyMax)`
+
+10. Password-derived encryption (PBKDF2 -> AES-GCM) via Web Crypto
+    `(add app/utils/crypto.ts + test/crypto.test.ts)`
