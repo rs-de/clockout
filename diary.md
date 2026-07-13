@@ -83,3 +83,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 26. "About" page + in-memory example demos, seeded via /example/:id (req #11)
     `(add examples.ts, about.tsx, /example+/about routes; wire app.tsx + tests)`
+
+27. Site-wide footer linking to About; simplify About to just links
+    `(edit document.tsx: add <footer>; edit about.tsx: drop prose)`

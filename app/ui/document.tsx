@@ -29,6 +29,9 @@ export function Document(handle: Handle<DocumentProps>) {
 				</head>
 				<body>
 					{children}
+					<footer>
+						<a href="/about">About clockout</a>
+					</footer>
 					<script
 						type="module"
 						src={routes.assets.href({ path: "app/assets/entry.ts" })}
