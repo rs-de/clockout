@@ -2,11 +2,13 @@ import assert from "node:assert/strict"
 import { describe, test } from "node:test"
 
 import {
+	catchupDays,
 	createTrackingData,
 	DEFAULT_DAILY_MAX,
 	DEFAULT_WEEKLY_TARGET_MIN,
 	formatDuration,
 	isRunning,
+	resolveCatchup,
 	startOfWeek,
 	summarize,
 	type TrackingData,
@@ -14,6 +16,10 @@ import {
 } from "../app/utils/time-tracking.ts"
 
 const H = 3600
+
+function toSec(date: Date): number {
+	return Math.floor(date.getTime() / 1000)
+}
 
 describe("formatDuration", () => {
 	test("formats whole hours and minutes", () => {
@@ -126,6 +132,80 @@ describe("workedSecondsInRange", () => {
 			new Date(24 * H * 1000),
 		)
 		assert.equal(seconds, 0)
+	})
+})
+
+describe("catchupDays", () => {
+	test("empty when there's no open start", () => {
+		assert.deepEqual(catchupDays([], new Date(2026, 6, 15)), [])
+	})
+
+	test("empty when the open start began today", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
+		]
+		assert.deepEqual(catchupDays(events, new Date(2026, 6, 15, 17, 0)), [])
+	})
+
+	test("one day when the open start began yesterday", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 14, 22, 0)), type: "start" as const },
+		]
+		const days = catchupDays(events, new Date(2026, 6, 15, 8, 0))
+		assert.deepEqual(
+			days.map((d) => d.getTime()),
+			[new Date(2026, 6, 14).getTime()],
+		)
+	})
+
+	test("one row per day up to (not including) today for a multi-day gap", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
+		]
+		const days = catchupDays(events, new Date(2026, 6, 14, 8, 0))
+		assert.deepEqual(
+			days.map((d) => d.getTime()),
+			[10, 11, 12, 13].map((date) => new Date(2026, 6, date).getTime()),
+		)
+	})
+})
+
+describe("resolveCatchup", () => {
+	test("returns events unchanged when there are no days to resolve", () => {
+		const events = [
+			{ t: 0, type: "start" as const },
+			{ t: 1 * H, type: "stop" as const },
+		]
+		assert.deepEqual(resolveCatchup(events, [], []), events)
+	})
+
+	test("adds only a stop for the open start's own day, preserving its timestamp", () => {
+		const startTs = toSec(new Date(2026, 6, 14, 22, 0))
+		const events = [{ t: startTs, type: "start" as const }]
+		const days = [new Date(2026, 6, 14)]
+
+		assert.deepEqual(resolveCatchup(events, days, [90]), [
+			{ t: startTs, type: "start" },
+			{ t: startTs + 90 * 60, type: "stop" },
+		])
+	})
+
+	test("adds a fresh start/stop pair anchored at local midnight for later days, skipping 0-entries", () => {
+		const startTs = toSec(new Date(2026, 6, 10, 9, 0))
+		const events = [{ t: startTs, type: "start" as const }]
+		const days = [
+			new Date(2026, 6, 10),
+			new Date(2026, 6, 11),
+			new Date(2026, 6, 12),
+		]
+		const day11Start = toSec(new Date(2026, 6, 11))
+
+		assert.deepEqual(resolveCatchup(events, days, [0, 120, 0]), [
+			{ t: startTs, type: "start" },
+			{ t: startTs, type: "stop" },
+			{ t: day11Start, type: "start" },
+			{ t: day11Start + 120 * 60, type: "stop" },
+		])
 	})
 })
 

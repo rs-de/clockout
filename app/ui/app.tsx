@@ -2,9 +2,11 @@ import { clientEntry, type Handle, on } from "remix/ui"
 
 import { loadTrackingData, saveTrackingData } from "../utils/local-store.ts"
 import {
+	catchupDays,
 	createTrackingData,
 	formatDuration,
 	isRunning,
+	resolveCatchup,
 	summarize,
 	type TrackingData,
 } from "../utils/time-tracking.ts"
@@ -136,6 +138,20 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		handle.update()
 	}
 
+	async function handleCatchupSubmit(
+		data: TrackingData,
+		days: Date[],
+		formData: FormData,
+	) {
+		const workedMinutesPerDay = days.map((_, i) =>
+			readMinutes(formData, `day-${i}-hours`, `day-${i}-minutes`),
+		)
+		data.events = resolveCatchup(data.events, days, workedMinutesPerDay)
+		await saveTrackingData(data)
+		handle.update()
+		if (sessionPassword) void syncToServer(data, sessionPassword)
+	}
+
 	async function handleToggle(data: TrackingData) {
 		data.events.push({
 			t: Math.floor(Date.now() / 1000),
@@ -254,6 +270,56 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		}
 
 		const { data } = view
+		const days = catchupDays(data.events, new Date())
+
+		if (days.length > 0) {
+			return (
+				<form
+					mix={on("submit", (event) => {
+						event.preventDefault()
+						void handleCatchupSubmit(
+							data,
+							days,
+							new FormData(event.currentTarget),
+						)
+					})}
+				>
+					<h1>clockout</h1>
+					<p>
+						Looks like you forgot to stop tracking. Enter how many hours you
+						worked on each day since then.
+					</p>
+					{days.map((day, i) => (
+						<fieldset key={day.getTime()}>
+							<legend>
+								{day.toLocaleDateString(undefined, {
+									weekday: "short",
+									day: "2-digit",
+									month: "2-digit",
+								})}
+							</legend>
+							<input
+								name={`day-${i}-hours`}
+								type="number"
+								min="0"
+								defaultValue="0"
+							/>{" "}
+							h
+							<input
+								name={`day-${i}-minutes`}
+								type="number"
+								min="0"
+								max="59"
+								defaultValue="0"
+							/>{" "}
+							m
+						</fieldset>
+					))}
+					<button type="submit">Save and continue</button>
+				</form>
+			)
+		}
+
 		const summary = summarize(data)
 
 		return (

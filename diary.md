@@ -59,3 +59,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 18. Fly.io deploy config (single host, volume-backed sync store)
     `(add Dockerfile, .dockerignore, fly.toml; pin packageManager)`
+
+19. Catch-up flow: backfill forgotten stop with per-day hours (req #9)
+    `(add catchupDays/resolveCatchup; add catchup form to app.tsx + tests)`
