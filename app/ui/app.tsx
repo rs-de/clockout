@@ -55,10 +55,24 @@ function syncStatusLabel(status: SyncStatus): string | null {
 	}
 }
 
+/**
+ * Cross-field match isn't expressible via native HTML attributes, so this is
+ * the one thing that needs a JS assist — via the Constraint Validation API
+ * rather than app state, so the browser still owns *when* to surface it
+ * (on submit attempt, same as `required`) and there's no "have we shown the
+ * error yet" flag to keep in sync.
+ */
+function syncPasswordMatchValidity(form: HTMLFormElement | null) {
+	if (!form) return
+	const password = form.elements.namedItem("password") as HTMLInputElement
+	const repeat = form.elements.namedItem("passwordRepeat") as HTMLInputElement
+	repeat.setCustomValidity(
+		password.value === repeat.value ? "" : "Passwords don't match",
+	)
+}
+
 export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 	let view: View = { kind: "loading" }
-	let password = ""
-	let passwordRepeat = ""
 
 	// Set once setup succeeds; kept in memory for the rest of this page load
 	// only (never persisted). A reload that finds data already in local
@@ -108,7 +122,7 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 			dailyMax: readMinutes(formData, "dailyHours", "dailyMinutes"),
 		})
 		await saveTrackingData(data)
-		sessionPassword = password
+		sessionPassword = String(formData.get("password") ?? "")
 		view = { kind: "tracking", data }
 		handle.update()
 		// Makes the URL bookmarkable so it can be used to recover this
@@ -194,15 +208,11 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		}
 
 		if (view.kind === "setup") {
-			const passwordsMatch = password.length > 0 && password === passwordRepeat
-
 			return (
 				<form
 					mix={on("submit", (event) => {
 						event.preventDefault()
-						if (passwordsMatch) {
-							void handleSetupSubmit(new FormData(event.currentTarget))
-						}
+						void handleSetupSubmit(new FormData(event.currentTarget))
 					})}
 				>
 					<h1>clockout</h1>
@@ -237,12 +247,12 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 					<label>
 						Password
 						<input
+							name="password"
 							type="password"
 							autoComplete="new-password"
 							required
 							mix={on("input", (event) => {
-								password = event.currentTarget.value
-								handle.update()
+								syncPasswordMatchValidity(event.currentTarget.form)
 							})}
 						/>
 					</label>
@@ -250,19 +260,15 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 					<label>
 						Repeat password
 						<input
+							name="passwordRepeat"
 							type="password"
 							autoComplete="new-password"
 							required
 							mix={on("input", (event) => {
-								passwordRepeat = event.currentTarget.value
-								handle.update()
+								syncPasswordMatchValidity(event.currentTarget.form)
 							})}
 						/>
 					</label>
-
-					{passwordRepeat.length > 0 && !passwordsMatch && (
-						<p role="alert">Passwords don't match</p>
-					)}
 
 					<button type="submit">Speichern und los ...</button>
 				</form>

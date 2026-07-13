@@ -68,3 +68,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 21. Never disable submit for live validation; validate on submit instead
     `(edit app.tsx setup form; add paradigms.md with this pattern)`
+
+22. Setup form: stateless cross-field validation via setCustomValidity
+    `(drop password/passwordRepeat/submitAttempted state; native validity)`
