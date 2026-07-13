@@ -136,13 +136,21 @@ describe("workedSecondsInRange", () => {
 })
 
 describe("catchupDays", () => {
-	test("empty when there's no open start", () => {
+	test("empty when there are no events at all", () => {
 		assert.deepEqual(catchupDays([], new Date(2026, 6, 15)), [])
 	})
 
 	test("empty when the open start began today", () => {
 		const events = [
 			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
+		]
+		assert.deepEqual(catchupDays(events, new Date(2026, 6, 15, 17, 0)), [])
+	})
+
+	test("empty when the last event is a stop from today", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 15, 12, 0)), type: "stop" as const },
 		]
 		assert.deepEqual(catchupDays(events, new Date(2026, 6, 15, 17, 0)), [])
 	})
@@ -158,7 +166,7 @@ describe("catchupDays", () => {
 		)
 	})
 
-	test("one row per day up to (not including) today for a multi-day gap", () => {
+	test("one row per day up to (not including) today for a multi-day gap after an open start", () => {
 		const events = [
 			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
 		]
@@ -166,6 +174,26 @@ describe("catchupDays", () => {
 		assert.deepEqual(
 			days.map((d) => d.getTime()),
 			[10, 11, 12, 13].map((date) => new Date(2026, 6, date).getTime()),
+		)
+	})
+
+	test("empty when a clean stop was yesterday (no full day missing yet)", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 14, 17, 0)), type: "stop" as const },
+		]
+		assert.deepEqual(catchupDays(events, new Date(2026, 6, 15, 8, 0)), [])
+	})
+
+	test("days after a clean stop, through yesterday, for a multi-day gap", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
+		]
+		const days = catchupDays(events, new Date(2026, 6, 14, 8, 0))
+		assert.deepEqual(
+			days.map((d) => d.getTime()),
+			[11, 12, 13].map((date) => new Date(2026, 6, date).getTime()),
 		)
 	})
 })
@@ -190,22 +218,64 @@ describe("resolveCatchup", () => {
 		])
 	})
 
-	test("adds a fresh start/stop pair anchored at local midnight for later days, skipping 0-entries", () => {
+	test("adds a fresh start/stop pair for later days, skipping non-final 0-entries but always marking the last day", () => {
 		const startTs = toSec(new Date(2026, 6, 10, 9, 0))
 		const events = [{ t: startTs, type: "start" as const }]
 		const days = [
 			new Date(2026, 6, 10),
 			new Date(2026, 6, 11),
 			new Date(2026, 6, 12),
+			new Date(2026, 6, 13),
 		]
 		const day11Start = toSec(new Date(2026, 6, 11))
+		const day13Start = toSec(new Date(2026, 6, 13))
 
-		assert.deepEqual(resolveCatchup(events, days, [0, 120, 0]), [
+		// day 10 (open start, 0min): marker stop only. day 11 (120min): full
+		// pair. day 12 (0min, not last): skipped entirely. day 13 (0min, but
+		// last): still gets a zero-duration marker pair.
+		assert.deepEqual(resolveCatchup(events, days, [0, 120, 0, 0]), [
 			{ t: startTs, type: "start" },
 			{ t: startTs, type: "stop" },
 			{ t: day11Start, type: "start" },
 			{ t: day11Start + 120 * 60, type: "stop" },
+			{ t: day13Start, type: "start" },
+			{ t: day13Start, type: "stop" },
 		])
+	})
+
+	test("adds a fresh pair for every day after a clean stop, marking even a 0-entry last day", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
+		]
+		const days = [new Date(2026, 6, 11), new Date(2026, 6, 12)]
+		const day11Start = toSec(new Date(2026, 6, 11))
+		const day12Start = toSec(new Date(2026, 6, 12))
+
+		assert.deepEqual(resolveCatchup(events, days, [240, 0]), [
+			...events,
+			{ t: day11Start, type: "start" },
+			{ t: day11Start + 240 * 60, type: "stop" },
+			{ t: day12Start, type: "start" },
+			{ t: day12Start, type: "stop" },
+		])
+	})
+
+	test("regression: a 0-entry on the last day doesn't reopen the same day next render", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
+		]
+		const now = new Date(2026, 6, 13, 8, 0)
+		const days = catchupDays(events, now)
+
+		const resolved = resolveCatchup(
+			events,
+			days,
+			days.map(() => 0),
+		)
+
+		assert.deepEqual(catchupDays(resolved, now), [])
 	})
 })
 

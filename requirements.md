@@ -16,5 +16,7 @@ Lean app for time tracking, so you can see how much work is still left
    time and day-remaining time always visible at the top.
 8. Data should be redundancy-free and compact (timestamps). Everything is
    derived from the event data resp. calculated on-the-fly.
-9. If the start date is (relative to local calender) a day before or earlier, 
-   the user seems to forgot the stop. In this case we have to show all days (one day per row) and the user can enter the working hours per day he did work since the last start.
+9. If the last event (start or stop) is not from today, the user likely
+   missed tracking one or more days. Show one row per missing day — the day
+   of an unfinished start (inclusive), or the day after the last stop,
+   through yesterday — so the user can enter the hours worked that day.

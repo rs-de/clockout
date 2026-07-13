@@ -62,3 +62,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 19. Catch-up flow: backfill forgotten stop with per-day hours (req #9)
     `(add catchupDays/resolveCatchup; add catchup form to app.tsx + tests)`
+
+20. Extend catch-up to also cover multi-day gaps after a clean stop (req #9)
+    `(edit requirements.md #9; generalize catchupDays/resolveCatchup + tests)`

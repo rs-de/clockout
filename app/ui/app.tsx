@@ -286,8 +286,8 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 				>
 					<h1>clockout</h1>
 					<p>
-						Looks like you forgot to stop tracking. Enter how many hours you
-						worked on each day since then.
+						Looks like tracking wasn't running on some past days. Enter how many
+						hours you worked on each day since then.
 					</p>
 					{days.map((day, i) => (
 						<fieldset key={day.getTime()}>

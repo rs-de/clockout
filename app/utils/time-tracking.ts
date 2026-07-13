@@ -62,54 +62,63 @@ export function isRunning(events: TimeEvent[]): boolean {
 	return lastEvent(events)?.type === "start"
 }
 
-/** The trailing unmatched "start" event, if tracking is currently running. */
-export function openStartEvent(events: TimeEvent[]): TimeEvent | null {
-	const last = lastEvent(events)
-	return last?.type === "start" ? last : null
-}
-
 /**
- * Calendar days (local, one entry per day) from the open start's day through
- * yesterday — the days requirement #9 asks the user to back-fill because the
- * "stop" was forgotten. Empty if tracking isn't running or started today.
+ * Calendar days (local, one entry per day) that requirement #9 asks the user
+ * to back-fill because nothing was tracked for them: either an unfinished
+ * open start's own day, or — if the last event is a clean stop — the days
+ * after it with no events at all. Runs through yesterday; empty if the last
+ * event is already from today (or there is no last event).
  */
 export function catchupDays(events: TimeEvent[], now: Date): Date[] {
-	const open = openStartEvent(events)
-	if (!open) return []
+	const last = lastEvent(events)
+	if (!last) return []
 
 	const today = startOfDay(now)
+	const lastDay = startOfDay(new Date(last.t * 1000))
+	if (lastDay.getTime() >= today.getTime()) return []
+
 	const days: Date[] = []
-	let day = startOfDay(new Date(open.t * 1000))
+	let day = last.type === "start" ? lastDay : addDays(lastDay, 1)
 	while (day.getTime() < today.getTime()) {
 		days.push(day)
-		day = new Date(day)
-		day.setDate(day.getDate() + 1)
+		day = addDays(day, 1)
 	}
 	return days
 }
 
+function addDays(day: Date, count: number): Date {
+	const result = new Date(day)
+	result.setDate(result.getDate() + count)
+	return result
+}
+
 /**
- * Backfills the forgotten days from requirement #9. `days` must be
- * `catchupDays(events, now)` and `workedMinutesPerDay` aligned to it. The
- * original start event (and its exact timestamp) is kept — only its missing
- * stop is added, at start + duration — while later days get a fresh
- * start/stop pair anchored at local midnight. Days entered as 0 get no
- * events.
+ * Backfills the days from requirement #9. `days` must be
+ * `catchupDays(events, now)` and `workedMinutesPerDay` aligned to it. If the
+ * last event is a still-open start, its exact timestamp is kept and only its
+ * missing stop is added (at start + duration) for `days[0]`; every other day
+ * gets a fresh start/stop pair anchored at local midnight. Days entered as 0
+ * get no events — except the last day in `days`, which always gets a
+ * (possibly zero-duration) marker so a fresh `catchupDays` call afterwards
+ * doesn't immediately re-open the same day.
  */
 export function resolveCatchup(
 	events: TimeEvent[],
 	days: Date[],
 	workedMinutesPerDay: number[],
 ): TimeEvent[] {
-	const open = openStartEvent(events)
-	if (!open || days.length === 0) return events
+	if (days.length === 0) return events
+	const last = lastEvent(events)
+	if (!last) return events
 
+	const preserveOpenStart = last.type === "start"
+	const lastDayIndex = days.length - 1
 	const result = [...events]
 	days.forEach((day, i) => {
 		const minutes = workedMinutesPerDay[i] ?? 0
-		if (i === 0) {
-			result.push({ t: open.t + minutes * 60, type: "stop" })
-		} else if (minutes > 0) {
+		if (i === 0 && preserveOpenStart) {
+			result.push({ t: last.t + minutes * 60, type: "stop" })
+		} else if (minutes > 0 || i === lastDayIndex) {
 			const dayStartSec = Math.floor(day.getTime() / 1000)
 			result.push({ t: dayStartSec, type: "start" })
 			result.push({ t: dayStartSec + minutes * 60, type: "stop" })
