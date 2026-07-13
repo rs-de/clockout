@@ -200,7 +200,9 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 				<form
 					mix={on("submit", (event) => {
 						event.preventDefault()
-						void handleSetupSubmit(new FormData(event.currentTarget))
+						if (passwordsMatch) {
+							void handleSetupSubmit(new FormData(event.currentTarget))
+						}
 					})}
 				>
 					<h1>clockout</h1>
@@ -262,9 +264,7 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 						<p role="alert">Passwords don't match</p>
 					)}
 
-					<button type="submit" disabled={!passwordsMatch}>
-						Speichern und los ...
-					</button>
+					<button type="submit">Speichern und los ...</button>
 				</form>
 			)
 		}

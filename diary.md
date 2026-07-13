@@ -65,3 +65,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 20. Extend catch-up to also cover multi-day gaps after a clean stop (req #9)
     `(edit requirements.md #9; generalize catchupDays/resolveCatchup + tests)`
+
+21. Never disable submit for live validation; validate on submit instead
+    `(edit app.tsx setup form; add paradigms.md with this pattern)`
