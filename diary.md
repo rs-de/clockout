@@ -80,3 +80,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 25. Offset-based event resolver, foundation for demo examples + QA fixtures
     `(add resolveRelativeEvents/RelativeEvent to time-tracking.ts + tests)`
+
+26. "About" page + in-memory example demos, seeded via /example/:id (req #11)
+    `(add examples.ts, about.tsx, /example+/about routes; wire app.tsx + tests)`

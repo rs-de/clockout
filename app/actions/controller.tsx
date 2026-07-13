@@ -2,6 +2,7 @@ import { createController } from "remix/router"
 
 import { assetServer } from "../assets.ts"
 import { routes } from "../routes.ts"
+import { AboutPage } from "../ui/about.tsx"
 import { App } from "../ui/app.tsx"
 import { Document } from "../ui/document.tsx"
 
@@ -24,6 +25,20 @@ export default createController(routes, {
 			return context.render(
 				<Document>
 					<App />
+				</Document>,
+			)
+		},
+		example(context) {
+			return context.render(
+				<Document>
+					<App />
+				</Document>,
+			)
+		},
+		about(context) {
+			return context.render(
+				<Document title="About — clockout">
+					<AboutPage />
 				</Document>,
 			)
 		},

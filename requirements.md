@@ -24,3 +24,8 @@ Lean app for time tracking, so you can see how much work is still left
    through yesterday — so the user can enter the hours worked that day.
 10. A start/stop pair shorter than 1 minute is discarded (not tracked, as
     if the start never happened) — most likely an accidental tap.
+11. An "About this app" page links to a few named examples (e.g. "forgot to
+    stop", "lunch break"). Opening one seeds throwaway, in-memory-only demo
+    data — nothing is saved or synced — so the real app can be tried without
+    setup. Each example simulates its own fixed weekday/time so the shown
+    numbers stay consistent no matter which real day it's opened on.

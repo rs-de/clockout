@@ -1,5 +1,11 @@
-import { clientEntry, type Handle, on } from "remix/ui"
+import { clientEntry, type Handle, on, type RemixNode } from "remix/ui"
 
+import {
+	buildExampleData,
+	type Example,
+	findExample,
+	resolvePretendNow,
+} from "../utils/examples.ts"
 import { loadTrackingData, saveTrackingData } from "../utils/local-store.ts"
 import {
 	catchupDays,
@@ -23,13 +29,22 @@ type View =
 	| { kind: "setup" }
 	| { kind: "unlock"; id: string; error?: string }
 	| { kind: "tracking"; data: TrackingData }
+	// In-memory only — see app/utils/examples.ts. `offsetMs` is the fixed
+	// gap between the example's pretend "now" and the real clock, captured
+	// once at load so the pretend clock still ticks forward live.
+	| { kind: "example"; data: TrackingData; example: Example; offsetMs: number }
 
 type SyncStatus = "idle" | "syncing" | "synced" | "error"
 
 const DOC_URL_PATTERN = /^\/d\/([A-Za-z0-9_-]+)$/
+const EXAMPLE_URL_PATTERN = /^\/example\/([a-z0-9-]+)$/
 
 function readDocIdFromUrl(): string | null {
 	return DOC_URL_PATTERN.exec(window.location.pathname)?.[1] ?? null
+}
+
+function readExampleIdFromUrl(): string | null {
+	return EXAMPLE_URL_PATTERN.exec(window.location.pathname)?.[1] ?? null
 }
 
 function readMinutes(
@@ -40,6 +55,14 @@ function readMinutes(
 	const hours = Number(formData.get(hoursField))
 	const minutes = Number(formData.get(minutesField))
 	return hours * 60 + minutes
+}
+
+function buildExampleView(example: Example): View {
+	const realNow = new Date()
+	const data = buildExampleData(example, realNow)
+	const offsetMs =
+		resolvePretendNow(example, realNow).getTime() - realNow.getTime()
+	return { kind: "example", data, example, offsetMs }
 }
 
 function syncStatusLabel(status: SyncStatus): string | null {
@@ -86,8 +109,14 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		if (data) {
 			view = { kind: "tracking", data }
 		} else {
-			const id = readDocIdFromUrl()
-			view = id ? { kind: "unlock", id } : { kind: "setup" }
+			const exampleId = readExampleIdFromUrl()
+			const example = exampleId ? findExample(exampleId) : undefined
+			if (example) {
+				view = buildExampleView(example)
+			} else {
+				const id = readDocIdFromUrl()
+				view = id ? { kind: "unlock", id } : { kind: "setup" }
+			}
 		}
 		handle.update()
 	})
@@ -171,6 +200,26 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		await saveTrackingData(data)
 		handle.update()
 		if (sessionPassword) void syncToServer(data, sessionPassword)
+	}
+
+	// Example handlers mirror the real ones above but stay in-memory only —
+	// no saveTrackingData, no syncToServer — since example data is strictly
+	// throwaway (see app/utils/examples.ts).
+	function handleExampleToggle(data: TrackingData, now: Date) {
+		data.events = toggleTracking(data.events, Math.floor(now.getTime() / 1000))
+		handle.update()
+	}
+
+	function handleExampleCatchupSubmit(
+		data: TrackingData,
+		days: Date[],
+		formData: FormData,
+	) {
+		const workedMinutesPerDay = days.map((_, i) =>
+			readMinutes(formData, `day-${i}-hours`, `day-${i}-minutes`),
+		)
+		data.events = resolveCatchup(data.events, days, workedMinutesPerDay)
+		handle.update()
 	}
 
 	return () => {
@@ -272,19 +321,59 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 			)
 		}
 
-		const { data } = view
-		const days = catchupDays(data.events, new Date())
+		if (view.kind === "tracking") {
+			const { data } = view
+			return renderTrackingScreen(
+				data,
+				new Date(),
+				() => void handleToggle(data),
+				(days, formData) => void handleCatchupSubmit(data, days, formData),
+				undefined,
+				syncStatusLabel(syncStatus) && (
+					<p role="status">{syncStatusLabel(syncStatus)}</p>
+				),
+			)
+		}
 
-		if (days.length > 0) {
-			return (
+		const { data, example, offsetMs } = view
+		const now = new Date(Date.now() + offsetMs)
+
+		return renderTrackingScreen(
+			data,
+			now,
+			() => handleExampleToggle(data, now),
+			(days, formData) => handleExampleCatchupSubmit(data, days, formData),
+			<p role="status">
+				Demo: simulating "{example.title}" —{" "}
+				{now.toLocaleString(undefined, {
+					weekday: "long",
+					hour: "2-digit",
+					minute: "2-digit",
+				})}
+				. Nothing here is saved. <a href="/about">Back to examples</a>
+			</p>,
+		)
+	}
+})
+
+function renderTrackingScreen(
+	data: TrackingData,
+	now: Date,
+	onToggle: () => void,
+	onCatchupSubmit: (days: Date[], formData: FormData) => void,
+	banner?: RemixNode,
+	footer?: RemixNode,
+) {
+	const days = catchupDays(data.events, now)
+
+	if (days.length > 0) {
+		return (
+			<div>
+				{banner}
 				<form
 					mix={on("submit", (event) => {
 						event.preventDefault()
-						void handleCatchupSubmit(
-							data,
-							days,
-							new FormData(event.currentTarget),
-						)
+						onCatchupSubmit(days, new FormData(event.currentTarget))
 					})}
 				>
 					<h1>clockout</h1>
@@ -320,36 +409,35 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 					))}
 					<button type="submit">Save and continue</button>
 				</form>
-			)
-		}
-
-		const summary = summarize(data)
-
-		return (
-			<div>
-				<p>Week remaining: {formatDuration(summary.weeklyRemainingSec)}</p>
-				<p>Day remaining: {formatDuration(summary.dailyRemainingSec)}</p>
-				{summary.startedAt !== null && (
-					<p>
-						Started at{" "}
-						{new Date(summary.startedAt * 1000).toLocaleTimeString(undefined, {
-							hour: "2-digit",
-							minute: "2-digit",
-						})}
-					</p>
-				)}
-				<button
-					type="button"
-					className="toggle-button"
-					mix={on("click", () => void handleToggle(data))}
-					data-running={summary.isRunning}
-				>
-					{summary.isRunning ? "Stop" : "Start"}
-				</button>
-				{syncStatusLabel(syncStatus) && (
-					<p role="status">{syncStatusLabel(syncStatus)}</p>
-				)}
 			</div>
 		)
 	}
-})
+
+	const summary = summarize(data, now)
+
+	return (
+		<div>
+			{banner}
+			<p>Week remaining: {formatDuration(summary.weeklyRemainingSec)}</p>
+			<p>Day remaining: {formatDuration(summary.dailyRemainingSec)}</p>
+			{summary.startedAt !== null && (
+				<p>
+					Started at{" "}
+					{new Date(summary.startedAt * 1000).toLocaleTimeString(undefined, {
+						hour: "2-digit",
+						minute: "2-digit",
+					})}
+				</p>
+			)}
+			<button
+				type="button"
+				className="toggle-button"
+				mix={on("click", onToggle)}
+				data-running={summary.isRunning}
+			>
+				{summary.isRunning ? "Stop" : "Start"}
+			</button>
+			{footer}
+		</div>
+	)
+}
