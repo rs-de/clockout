@@ -347,6 +347,52 @@ describe("resolveCatchup", () => {
 
 		assert.deepEqual(catchupDays(resolved, now), [])
 	})
+
+	test("regression: a large day-0 entry chains into later days instead of colliding or losing hours", () => {
+		// An 08:00 start plus 20h would naturally end at 04:00 the next day,
+		// landing after day 1's own start (00:00) and before day 1's own stop
+		// (20:00) if day 1 were independently anchored at midnight -
+		// workedSecondsInRange's start/stop toggle would then treat day 1's
+		// start as re-opening the session, silently discarding day 0's hours,
+		// and day 1's stop as closing an already-closed session, discarding
+		// day 1's hours too. Chaining day 1 to start when day 0's session
+		// actually ends (instead of always at midnight) keeps every pair
+		// non-overlapping *and* credits the full entered duration for every
+		// day - no clamping, no lost hours.
+		const startTs = toSec(new Date(2026, 6, 13, 8, 0)) // Monday 08:00
+		const events = [{ t: startTs, type: "start" as const }]
+		const days = [
+			new Date(2026, 6, 13),
+			new Date(2026, 6, 14),
+			new Date(2026, 6, 15),
+		]
+
+		const resolved = resolveCatchup(events, days, [20 * 60, 20 * 60, 20 * 60])
+
+		// Three fully back-to-back 20h sessions: Mon 08:00 -> Tue 04:00 ->
+		// Wed 00:00 -> Wed 20:00, each chained exactly where the last ended.
+		assert.deepEqual(resolved, [
+			{ t: startTs, type: "start" },
+			{ t: startTs + 20 * H, type: "stop" },
+			{ t: startTs + 20 * H, type: "start" },
+			{ t: startTs + 40 * H, type: "stop" },
+			{ t: startTs + 40 * H, type: "start" },
+			{ t: startTs + 60 * H, type: "stop" },
+		])
+
+		const summary = summarize(
+			{
+				id: "test-doc",
+				settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+				events: resolved,
+			},
+			new Date(2026, 6, 16, 10, 0),
+		)
+		// Exactly 60h credited (35h target - 60h = -25h) - not the ~24h the
+		// interleaving bug produced, nor a clamped ~56h.
+		assert.equal(summary.weeklyWorkedSec, 60 * H)
+		assert.equal(summary.weeklyRemainingSec, -25 * H)
+	})
 })
 
 describe("startOfWeek", () => {
@@ -440,5 +486,55 @@ describe("summarize", () => {
 		const summary = summarize(data, new Date(2026, 6, 15, 8, 0))
 
 		assert.equal(summary.startedAt, null)
+	})
+
+	test("dailyRemainingSec floors at 0 once the week's target is already met, even if today has no work yet", () => {
+		const data: TrackingData = {
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+			events: [
+				// 72h logged Mon 09:00 -> Thu 09:00, already well over the 35h target.
+				{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" },
+				{ t: toSec(new Date(2026, 6, 16, 9, 0)), type: "stop" },
+			],
+		}
+		// Friday, nothing logged yet today.
+		const summary = summarize(data, new Date(2026, 6, 17, 10, 0))
+
+		assert.ok(summary.weeklyRemainingSec < 0)
+		assert.equal(summary.dailyRemainingSec, 0)
+	})
+
+	test("dailyRemainingSec keeps a real same-day overage even when the week is also already over", () => {
+		const data: TrackingData = {
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+			events: [
+				// 72h logged Mon 09:00 -> Thu 09:00, plus 12h logged today
+				// (Friday) - both the week and today's own daily max are
+				// individually blown.
+				{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" },
+				{ t: toSec(new Date(2026, 6, 16, 9, 0)), type: "stop" },
+				{ t: toSec(new Date(2026, 6, 17, 8, 0)), type: "start" },
+				{ t: toSec(new Date(2026, 6, 17, 20, 0)), type: "stop" },
+			],
+		}
+		const summary = summarize(data, new Date(2026, 6, 17, 21, 0))
+
+		const dailyMaxSec = (9 * 60 + 55) * 60
+		assert.ok(summary.weeklyRemainingSec < 0)
+		assert.equal(summary.dailyRemainingSec, dailyMaxSec - 12 * H)
+	})
+
+	test("dailyRemainingSec is unaffected while the week still has time left", () => {
+		const data: TrackingData = {
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+			events: [],
+		}
+		const summary = summarize(data, new Date(2026, 6, 17, 10, 0))
+
+		assert.ok(summary.weeklyRemainingSec > 0)
+		assert.equal(summary.dailyRemainingSec, (9 * 60 + 55) * 60)
 	})
 })

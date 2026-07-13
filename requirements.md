@@ -29,3 +29,7 @@ Lean app for time tracking, so you can see how much work is still left
     data — nothing is saved or synced — so the real app can be tried without
     setup. Each example simulates its own fixed weekday/time so the shown
     numbers stay consistent no matter which real day it's opened on.
+12. Once the week's target is already met, day-remaining shows 0 rather than
+    a full/positive value that implies budget is still available — unless
+    today's own hours already exceed the daily max on their own, in which
+    case that real, same-day overage still shows.

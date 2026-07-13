@@ -86,3 +86,9 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 27. Site-wide footer linking to About; simplify About to just links
     `(edit document.tsx: add <footer>; edit about.tsx: drop prose)`
+
+28. Fix: chain catch-up sessions sequentially (fixes wrong weekly total)
+    `(edit resolveCatchup: chain days instead of midnight-anchoring; tests)`
+
+29. Day-remaining floors at 0 once the week's target is already met (req #12)
+    `(edit summarize: floor dailyRemainingSec unless today itself overruns)`

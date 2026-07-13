@@ -170,9 +170,16 @@ export function resolveRelativeEvents(
  * Backfills the days from requirement #9. `days` must be
  * `catchupDays(events, now)` and `workedMinutesPerDay` aligned to it. If the
  * last event is a still-open start, its exact timestamp is kept and only its
- * missing stop is added (at start + duration) for `days[0]`; every other day
- * gets a fresh start/stop pair anchored at local midnight. Days entered as 0
- * get no events — except the last day in `days`, which always gets a
+ * missing stop is added (at start + duration) for `days[0]`. Every other day
+ * gets a fresh start/stop pair, anchored at local midnight *or* right after
+ * the previous day's session ends, whichever is later — so a day entered
+ * with enough hours to run past midnight (e.g. a forgotten start at 08:00
+ * plus 20h) still credits its full duration instead of getting clamped, and
+ * the next day's session is chained after it instead of overlapping it (see
+ * the regression test: a naive midnight anchor would make the two sessions
+ * interleave, which breaks workedSecondsInRange's single-open-start
+ * assumption and silently discards most of both days' hours). Days entered
+ * as 0 get no events — except the last day in `days`, which always gets a
  * (possibly zero-duration) marker so a fresh `catchupDays` call afterwards
  * doesn't immediately re-open the same day.
  */
@@ -188,14 +195,22 @@ export function resolveCatchup(
 	const preserveOpenStart = last.type === "start"
 	const lastDayIndex = days.length - 1
 	const result = [...events]
+	let cursorSec: number | null = null // earliest the next session may start
+
 	days.forEach((day, i) => {
 		const minutes = workedMinutesPerDay[i] ?? 0
 		if (i === 0 && preserveOpenStart) {
-			result.push({ t: last.t + minutes * 60, type: "stop" })
+			const stopSec = last.t + minutes * 60
+			result.push({ t: stopSec, type: "stop" })
+			cursorSec = stopSec
 		} else if (minutes > 0 || i === lastDayIndex) {
 			const dayStartSec = Math.floor(day.getTime() / 1000)
-			result.push({ t: dayStartSec, type: "start" })
-			result.push({ t: dayStartSec + minutes * 60, type: "stop" })
+			const startSec =
+				cursorSec !== null ? Math.max(cursorSec, dayStartSec) : dayStartSec
+			const stopSec = startSec + minutes * 60
+			result.push({ t: startSec, type: "start" })
+			result.push({ t: stopSec, type: "stop" })
+			cursorSec = stopSec
 		}
 	})
 	return result
@@ -277,12 +292,24 @@ export function summarize(
 		now,
 	)
 
+	const rawDailyRemainingSec = data.settings.dailyMax * 60 - dailyWorkedSec
+	const weeklyRemainingSec =
+		data.settings.weeklyTargetMin * 60 - weeklyWorkedSec
+	// Once the week's target is already met, don't imply there's still a
+	// full day's budget left today — floor at 0. A day that's already gone
+	// over on its own stays negative, though; that's real overage, not the
+	// "week is already done" case this floor is for.
+	const dailyRemainingSec =
+		weeklyRemainingSec <= 0
+			? Math.min(rawDailyRemainingSec, 0)
+			: rawDailyRemainingSec
+
 	return {
 		isRunning: isRunning(data.events),
 		startedAt: firstStartToday(data.events, now)?.t ?? null,
 		dailyWorkedSec,
-		dailyRemainingSec: data.settings.dailyMax * 60 - dailyWorkedSec,
+		dailyRemainingSec,
 		weeklyWorkedSec,
-		weeklyRemainingSec: data.settings.weeklyTargetMin * 60 - weeklyWorkedSec,
+		weeklyRemainingSec,
 	}
 }
