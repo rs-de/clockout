@@ -77,3 +77,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 24. Discard start/stop pairs under 1 minute as accidental taps (req #10)
     `(add toggleTracking/MIN_SESSION_SEC; wire into handleToggle + tests)`
+
+25. Offset-based event resolver, foundation for demo examples + QA fixtures
+    `(add resolveRelativeEvents/RelativeEvent to time-tracking.ts + tests)`

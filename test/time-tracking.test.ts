@@ -10,6 +10,7 @@ import {
 	isRunning,
 	MIN_SESSION_SEC,
 	resolveCatchup,
+	resolveRelativeEvents,
 	startOfWeek,
 	summarize,
 	type TrackingData,
@@ -93,6 +94,49 @@ describe("toggleTracking", () => {
 		]
 		assert.deepEqual(toggleTracking(events, MIN_SESSION_SEC - 1), [
 			{ t: -100, type: "stop" },
+		])
+	})
+})
+
+describe("resolveRelativeEvents", () => {
+	test("resolves daysAgo/time relative to now into a concrete timestamp", () => {
+		const now = new Date(2026, 6, 15, 10, 0)
+		const resolved = resolveRelativeEvents(
+			[{ daysAgo: 3, time: "22:00", type: "start" }],
+			now,
+		)
+		assert.deepEqual(resolved, [
+			{ t: toSec(new Date(2026, 6, 12, 22, 0)), type: "start" },
+		])
+	})
+
+	test("resolves multiple events, preserving order", () => {
+		const now = new Date(2026, 6, 15, 10, 0)
+		const resolved = resolveRelativeEvents(
+			[
+				{ daysAgo: 1, time: "09:00", type: "start" },
+				{ daysAgo: 1, time: "17:00", type: "stop" },
+				{ daysAgo: 0, time: "09:00", type: "start" },
+			],
+			now,
+		)
+		assert.deepEqual(resolved, [
+			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" },
+			{ t: toSec(new Date(2026, 6, 14, 17, 0)), type: "stop" },
+			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" },
+		])
+	})
+
+	test("stays valid regardless of which real day `now` falls on", () => {
+		const nowA = new Date(2026, 6, 15, 10, 0)
+		const nowB = new Date(2027, 2, 1, 10, 0)
+		const descriptor = [{ daysAgo: 2, time: "08:30", type: "start" as const }]
+
+		assert.deepEqual(resolveRelativeEvents(descriptor, nowA), [
+			{ t: toSec(new Date(2026, 6, 13, 8, 30)), type: "start" },
+		])
+		assert.deepEqual(resolveRelativeEvents(descriptor, nowB), [
+			{ t: toSec(new Date(2027, 1, 27, 8, 30)), type: "start" },
 		])
 	})
 })
@@ -361,5 +405,40 @@ describe("summarize", () => {
 			events: [],
 		}
 		assert.equal(summarize(data, new Date(0)).startedAt, null)
+	})
+
+	test("startedAt stays pinned to today's first start across a stop/restart (e.g. lunch break)", () => {
+		const morningStart = toSec(new Date(2026, 6, 15, 9, 0))
+		const lunchStop = toSec(new Date(2026, 6, 15, 12, 0))
+		const afternoonStart = toSec(new Date(2026, 6, 15, 13, 0))
+		const data: TrackingData = {
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+			events: [
+				{ t: morningStart, type: "start" },
+				{ t: lunchStop, type: "stop" },
+				{ t: afternoonStart, type: "start" },
+			],
+		}
+		const summary = summarize(data, new Date(2026, 6, 15, 14, 0))
+
+		assert.equal(summary.isRunning, true)
+		assert.equal(summary.startedAt, morningStart)
+	})
+
+	test("startedAt is null if nothing has started today, even after yesterday's activity", () => {
+		const yesterdayStart = toSec(new Date(2026, 6, 14, 9, 0))
+		const yesterdayStop = toSec(new Date(2026, 6, 14, 17, 0))
+		const data: TrackingData = {
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+			events: [
+				{ t: yesterdayStart, type: "start" },
+				{ t: yesterdayStop, type: "stop" },
+			],
+		}
+		const summary = summarize(data, new Date(2026, 6, 15, 8, 0))
+
+		assert.equal(summary.startedAt, null)
 	})
 })

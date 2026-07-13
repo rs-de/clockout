@@ -32,9 +32,9 @@ export function createTrackingData(
 export type TrackingSummary = {
 	isRunning: boolean
 	/**
-	 * Unix timestamp (seconds) of the most recent "start" event, whether that
-	 * session is still running or has since stopped. `null` if there's no
-	 * start event at all yet.
+	 * Unix timestamp (seconds) of today's first "start" event — fixed for
+	 * the day regardless of later stop/restart cycles. `null` if nothing
+	 * has started yet today.
 	 */
 	startedAt: number | null
 	dailyWorkedSec: number
@@ -64,14 +64,23 @@ function lastEvent(events: TimeEvent[]): TimeEvent | undefined {
 	return [...events].sort((a, b) => a.t - b.t).at(-1)
 }
 
-/** The most recent "start" event, whether that session is still running or has since stopped. */
-function mostRecentStart(events: TimeEvent[]): TimeEvent | undefined {
-	const sorted = [...events].sort((a, b) => a.t - b.t)
-	for (let i = sorted.length - 1; i >= 0; i--) {
-		const event = sorted[i]
-		if (event?.type === "start") return event
-	}
-	return undefined
+/**
+ * The first "start" event of `now`'s calendar day, if any — stays fixed
+ * across a lunch-break-style stop/restart instead of jumping to whichever
+ * start happened most recently.
+ */
+function firstStartToday(
+	events: TimeEvent[],
+	now: Date,
+): TimeEvent | undefined {
+	const today = startOfDay(now).getTime()
+	return [...events]
+		.sort((a, b) => a.t - b.t)
+		.find(
+			(event) =>
+				event.type === "start" &&
+				startOfDay(new Date(event.t * 1000)).getTime() === today,
+		)
 }
 
 export function isRunning(events: TimeEvent[]): boolean {
@@ -128,6 +137,33 @@ function addDays(day: Date, count: number): Date {
 	const result = new Date(day)
 	result.setDate(result.getDate() + count)
 	return result
+}
+
+export type RelativeEvent = {
+	/** Calendar days before `now`'s day; 0 = today. */
+	daysAgo: number
+	/** Local time-of-day, 24h "HH:MM". */
+	time: string
+	type: TimeEventType
+}
+
+/**
+ * Resolves offset-based event descriptors (e.g. "3 days ago at 22:00") into
+ * concrete Unix timestamps relative to `now`. Used for demo examples and
+ * QA fixtures that need to stay valid no matter when they're loaded, unlike
+ * a snapshot of absolute timestamps, which goes stale the moment "today"
+ * moves on.
+ */
+export function resolveRelativeEvents(
+	relativeEvents: RelativeEvent[],
+	now: Date,
+): TimeEvent[] {
+	return relativeEvents.map(({ daysAgo, time, type }) => {
+		const [hours, minutes] = time.split(":").map(Number)
+		const day = addDays(startOfDay(now), -daysAgo)
+		day.setHours(hours ?? 0, minutes ?? 0, 0, 0)
+		return { t: Math.floor(day.getTime() / 1000), type }
+	})
 }
 
 /**
@@ -243,7 +279,7 @@ export function summarize(
 
 	return {
 		isRunning: isRunning(data.events),
-		startedAt: mostRecentStart(data.events)?.t ?? null,
+		startedAt: firstStartToday(data.events, now)?.t ?? null,
 		dailyWorkedSec,
 		dailyRemainingSec: data.settings.dailyMax * 60 - dailyWorkedSec,
 		weeklyWorkedSec,

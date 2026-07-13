@@ -13,8 +13,9 @@ Lean app for time tracking, so you can see how much work is still left
 6. Config and password (with repetition) on the start page; continue with
    button "Save and go...".
 7. Tracking: a "start" button (green), a "stop" button (red); week-remaining
-   time and day-remaining time always visible at the top. The most recent
-   session's start time is always shown too, running or not.
+   time and day-remaining time always visible at the top. Today's first
+   start time is always shown too — fixed for the day, unaffected by any
+   later stop/restart (e.g. a lunch break).
 8. Data should be redundancy-free and compact (timestamps). Everything is
    derived from the event data resp. calculated on-the-fly.
 9. If the last event (start or stop) is not from today, the user likely
