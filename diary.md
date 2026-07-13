@@ -92,3 +92,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 29. Day-remaining floors at 0 once the week's target is already met (req #12)
     `(edit summarize: floor dailyRemainingSec unless today itself overruns)`
+
+30. Always show a per-day weekly breakdown; add "did not work" checkbox
+    `(add weeklyBreakdown + skipDay event type; wire checkbox in app.tsx)`

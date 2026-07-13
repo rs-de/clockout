@@ -15,6 +15,7 @@ import {
 	summarize,
 	type TrackingData,
 	toggleTracking,
+	weeklyBreakdown,
 	workedSecondsInRange,
 } from "../app/utils/time-tracking.ts"
 
@@ -203,6 +204,62 @@ describe("workedSecondsInRange", () => {
 		)
 		assert.equal(seconds, 0)
 	})
+
+	test("a skipDay marker contributes nothing and doesn't open or close a session", () => {
+		const events = [
+			{ t: 0, type: "skipDay" as const },
+			{ t: 1 * H, type: "start" as const },
+			{ t: 3 * H, type: "stop" as const },
+		]
+		const seconds = workedSecondsInRange(
+			events,
+			new Date(0),
+			new Date(24 * H * 1000),
+			new Date(24 * H * 1000),
+		)
+		assert.equal(seconds, 2 * H)
+	})
+})
+
+describe("weeklyBreakdown", () => {
+	test("returns one entry per day of the week, Monday first", () => {
+		const now = new Date(2026, 6, 15, 13, 30) // Wednesday
+		const breakdown = weeklyBreakdown([], now)
+
+		assert.equal(breakdown.length, 7)
+		assert.equal(breakdown[0]?.day.getDate(), 13) // Monday
+		assert.equal(breakdown[6]?.day.getDate(), 19) // Sunday
+		assert.ok(breakdown.every((entry) => entry.workedSec === 0))
+	})
+
+	test("attributes each day's worked seconds to the right entry", () => {
+		const monday9to17 = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+		]
+		const tuesday9to12 = [
+			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 14, 12, 0)), type: "stop" as const },
+		]
+		const now = new Date(2026, 6, 15, 10, 0) // Wednesday
+
+		const breakdown = weeklyBreakdown([...monday9to17, ...tuesday9to12], now)
+
+		assert.equal(breakdown[0]?.workedSec, 8 * H) // Monday
+		assert.equal(breakdown[1]?.workedSec, 3 * H) // Tuesday
+		assert.equal(breakdown[2]?.workedSec, 0) // Wednesday, nothing yet
+	})
+
+	test("clips an open session live up to `now`", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+		]
+		const now = new Date(2026, 6, 13, 11, 30) // same Monday, still running
+
+		const breakdown = weeklyBreakdown(events, now)
+
+		assert.equal(breakdown[0]?.workedSec, 2.5 * H)
+	})
 })
 
 describe("catchupDays", () => {
@@ -266,6 +323,15 @@ describe("catchupDays", () => {
 			[11, 12, 13].map((date) => new Date(2026, 6, date).getTime()),
 		)
 	})
+
+	test("a trailing skipDay marker resolves the gap, same as a clean stop", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 11)), type: "skipDay" as const },
+		]
+		assert.deepEqual(catchupDays(events, new Date(2026, 6, 12, 8, 0)), [])
+	})
 })
 
 describe("resolveCatchup", () => {
@@ -288,7 +354,7 @@ describe("resolveCatchup", () => {
 		])
 	})
 
-	test("adds a fresh start/stop pair for later days, skipping non-final 0-entries but always marking the last day", () => {
+	test("adds a fresh start/stop pair for worked days and a skipDay marker for every 0-entry day", () => {
 		const startTs = toSec(new Date(2026, 6, 10, 9, 0))
 		const events = [{ t: startTs, type: "start" as const }]
 		const days = [
@@ -298,22 +364,24 @@ describe("resolveCatchup", () => {
 			new Date(2026, 6, 13),
 		]
 		const day11Start = toSec(new Date(2026, 6, 11))
+		const day12Start = toSec(new Date(2026, 6, 12))
 		const day13Start = toSec(new Date(2026, 6, 13))
 
-		// day 10 (open start, 0min): marker stop only. day 11 (120min): full
-		// pair. day 12 (0min, not last): skipped entirely. day 13 (0min, but
-		// last): still gets a zero-duration marker pair.
+		// day 10 (open start, 0min): marker stop only, closing the real
+		// dangling start. day 11 (120min): full pair. day 12 (0min, not
+		// last): skipDay. day 13 (0min, last): also skipDay - every 0-entry
+		// day is marked the same way now, not just the last.
 		assert.deepEqual(resolveCatchup(events, days, [0, 120, 0, 0]), [
 			{ t: startTs, type: "start" },
 			{ t: startTs, type: "stop" },
 			{ t: day11Start, type: "start" },
 			{ t: day11Start + 120 * 60, type: "stop" },
-			{ t: day13Start, type: "start" },
-			{ t: day13Start, type: "stop" },
+			{ t: day12Start, type: "skipDay" },
+			{ t: day13Start, type: "skipDay" },
 		])
 	})
 
-	test("adds a fresh pair for every day after a clean stop, marking even a 0-entry last day", () => {
+	test("adds a fresh pair for worked days and a skipDay marker for a 0-entry day after a clean stop", () => {
 		const events = [
 			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
 			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
@@ -326,9 +394,38 @@ describe("resolveCatchup", () => {
 			...events,
 			{ t: day11Start, type: "start" },
 			{ t: day11Start + 240 * 60, type: "stop" },
-			{ t: day12Start, type: "start" },
-			{ t: day12Start, type: "stop" },
+			{ t: day12Start, type: "skipDay" },
 		])
+	})
+
+	test("a skipDay marker never disrupts an overlapping real session", () => {
+		// Day 0's session (chained from an 08:00 start plus a lot of hours)
+		// can spill past midnight into a day the user separately marks as
+		// skipped - the skipDay marker must still be a pure no-op so it can
+		// never re-open/close a session it happens to fall inside of.
+		const startTs = toSec(new Date(2026, 6, 13, 8, 0)) // Monday 08:00
+		const events = [{ t: startTs, type: "start" as const }]
+		const days = [new Date(2026, 6, 13), new Date(2026, 6, 14)]
+
+		const resolved = resolveCatchup(events, days, [20 * 60, 0])
+
+		assert.deepEqual(resolved, [
+			{ t: startTs, type: "start" },
+			{ t: startTs + 20 * H, type: "stop" }, // Tuesday 04:00
+			{ t: toSec(new Date(2026, 6, 14)), type: "skipDay" }, // Tuesday 00:00
+		])
+
+		const summary = summarize(
+			{
+				id: "test-doc",
+				settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+				events: resolved,
+			},
+			new Date(2026, 6, 15, 10, 0),
+		)
+		// Full 20h still counted, unaffected by the skipDay marker landing
+		// chronologically inside the session.
+		assert.equal(summary.weeklyWorkedSec, 20 * H)
 	})
 
 	test("regression: a 0-entry on the last day doesn't reopen the same day next render", () => {

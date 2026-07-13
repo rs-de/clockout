@@ -1,9 +1,13 @@
 import { nanoid } from "nanoid"
 
-export type TimeEventType = "start" | "stop"
+export type TimeEventType = "start" | "stop" | "skipDay"
 
 export type TimeEvent = {
-	/** Unix timestamp in seconds. */
+	/**
+	 * Unix timestamp in seconds. For "skipDay" — an explicit "no work done
+	 * this day" marker, e.g. from the catch-up form — this is that day's
+	 * local midnight, not a real point-in-time event.
+	 */
 	t: number
 	type: TimeEventType
 }
@@ -170,18 +174,19 @@ export function resolveRelativeEvents(
  * Backfills the days from requirement #9. `days` must be
  * `catchupDays(events, now)` and `workedMinutesPerDay` aligned to it. If the
  * last event is a still-open start, its exact timestamp is kept and only its
- * missing stop is added (at start + duration) for `days[0]`. Every other day
- * gets a fresh start/stop pair, anchored at local midnight *or* right after
- * the previous day's session ends, whichever is later — so a day entered
- * with enough hours to run past midnight (e.g. a forgotten start at 08:00
- * plus 20h) still credits its full duration instead of getting clamped, and
- * the next day's session is chained after it instead of overlapping it (see
- * the regression test: a naive midnight anchor would make the two sessions
- * interleave, which breaks workedSecondsInRange's single-open-start
- * assumption and silently discards most of both days' hours). Days entered
- * as 0 get no events — except the last day in `days`, which always gets a
- * (possibly zero-duration) marker so a fresh `catchupDays` call afterwards
- * doesn't immediately re-open the same day.
+ * missing stop is added (at start + duration) for `days[0]` — even if 0
+ * minutes, since that dangling start must be closed somehow regardless.
+ * Every other day with minutes > 0 gets a fresh start/stop pair, anchored at
+ * local midnight *or* right after the previous day's session ends, whichever
+ * is later — so a day entered with enough hours to run past midnight (e.g. a
+ * forgotten start at 08:00 plus 20h) still credits its full duration instead
+ * of getting clamped, and the next day's session is chained after it instead
+ * of overlapping it (see the regression test: a naive midnight anchor would
+ * make the two sessions interleave, which breaks workedSecondsInRange's
+ * single-open-start assumption and silently discards most of both days'
+ * hours). Every other day entered as 0 gets an explicit "skipDay" marker
+ * instead — not just the last one — so "no work today" is recorded
+ * unambiguously and a fresh `catchupDays` call afterwards never re-opens it.
  */
 export function resolveCatchup(
 	events: TimeEvent[],
@@ -193,24 +198,29 @@ export function resolveCatchup(
 	if (!last) return events
 
 	const preserveOpenStart = last.type === "start"
-	const lastDayIndex = days.length - 1
 	const result = [...events]
 	let cursorSec: number | null = null // earliest the next session may start
 
 	days.forEach((day, i) => {
 		const minutes = workedMinutesPerDay[i] ?? 0
+		const dayStartSec = Math.floor(day.getTime() / 1000)
+
 		if (i === 0 && preserveOpenStart) {
 			const stopSec = last.t + minutes * 60
 			result.push({ t: stopSec, type: "stop" })
 			cursorSec = stopSec
-		} else if (minutes > 0 || i === lastDayIndex) {
-			const dayStartSec = Math.floor(day.getTime() / 1000)
+			return
+		}
+
+		if (minutes > 0) {
 			const startSec =
 				cursorSec !== null ? Math.max(cursorSec, dayStartSec) : dayStartSec
 			const stopSec = startSec + minutes * 60
 			result.push({ t: startSec, type: "start" })
 			result.push({ t: stopSec, type: "stop" })
 			cursorSec = stopSec
+		} else {
+			result.push({ t: dayStartSec, type: "skipDay" })
 		}
 	})
 	return result
@@ -218,7 +228,11 @@ export function resolveCatchup(
 
 /**
  * Seconds worked within [rangeStart, rangeEnd), reconstructed from start/stop
- * events. A trailing unmatched start is treated as still running, clipped to `now`.
+ * events. A trailing unmatched start is treated as still running, clipped to
+ * `now`. "skipDay" markers are pure no-ops here — they neither open nor
+ * close a session — so they can never disrupt a real session that happens
+ * to overlap one chronologically (e.g. a chained catch-up session spilling
+ * into a day the user separately marked as skipped).
  */
 export function workedSecondsInRange(
 	events: TimeEvent[],
@@ -237,7 +251,7 @@ export function workedSecondsInRange(
 	for (const event of sorted) {
 		if (event.type === "start") {
 			openStart = event.t
-		} else if (openStart !== null) {
+		} else if (event.type === "stop" && openStart !== null) {
 			total += overlapSeconds(openStart, event.t, rangeStartSec, rangeEndSec)
 			openStart = null
 		}
@@ -248,6 +262,28 @@ export function workedSecondsInRange(
 	}
 
 	return total
+}
+
+export type DailyBreakdownEntry = {
+	day: Date
+	workedSec: number
+}
+
+/**
+ * Per-day worked seconds for every day of `now`'s week (Monday..Sunday),
+ * so the numbers behind "Week remaining" are always visible and checkable
+ * rather than a black-box total.
+ */
+export function weeklyBreakdown(
+	events: TimeEvent[],
+	now: Date,
+): DailyBreakdownEntry[] {
+	const weekStart = startOfWeek(now)
+	return Array.from({ length: 7 }, (_, i) => {
+		const day = addDays(weekStart, i)
+		const dayEnd = addDays(day, 1)
+		return { day, workedSec: workedSecondsInRange(events, day, dayEnd, now) }
+	})
 }
 
 /** e.g. `-0h 15m` for 15 minutes over. */

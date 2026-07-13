@@ -15,6 +15,7 @@ import {
 	summarize,
 	type TrackingData,
 	toggleTracking,
+	weeklyBreakdown,
 } from "../utils/time-tracking.ts"
 import {
 	decryptTrackingData,
@@ -55,6 +56,22 @@ function readMinutes(
 	const hours = Number(formData.get(hoursField))
 	const minutes = Number(formData.get(minutesField))
 	return hours * 60 + minutes
+}
+
+/** The "did not work" checkbox always wins over whatever's left in the hour/minute fields. */
+function readCatchupMinutes(formData: FormData, i: number): number {
+	if (formData.get(`day-${i}-skip`) === "on") return 0
+	return readMinutes(formData, `day-${i}-hours`, `day-${i}-minutes`)
+}
+
+function toggleCatchupDayFields(
+	fieldset: HTMLFieldSetElement | null,
+	disabled: boolean,
+) {
+	if (!fieldset) return
+	for (const input of fieldset.querySelectorAll("input[type=number]")) {
+		;(input as HTMLInputElement).disabled = disabled
+	}
 }
 
 function buildExampleView(example: Example): View {
@@ -192,7 +209,7 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		formData: FormData,
 	) {
 		const workedMinutesPerDay = days.map((_, i) =>
-			readMinutes(formData, `day-${i}-hours`, `day-${i}-minutes`),
+			readCatchupMinutes(formData, i),
 		)
 		data.events = resolveCatchup(data.events, days, workedMinutesPerDay)
 		await saveTrackingData(data)
@@ -221,7 +238,7 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		formData: FormData,
 	) {
 		const workedMinutesPerDay = days.map((_, i) =>
-			readMinutes(formData, `day-${i}-hours`, `day-${i}-minutes`),
+			readCatchupMinutes(formData, i),
 		)
 		data.events = resolveCatchup(data.events, days, workedMinutesPerDay)
 		handle.update()
@@ -424,6 +441,19 @@ function renderTrackingScreen(
 								defaultValue="0"
 							/>{" "}
 							m
+							<label>
+								<input
+									name={`day-${i}-skip`}
+									type="checkbox"
+									mix={on("change", (event) => {
+										toggleCatchupDayFields(
+											event.currentTarget.closest("fieldset"),
+											event.currentTarget.checked,
+										)
+									})}
+								/>{" "}
+								Did not work
+							</label>
 						</fieldset>
 					))}
 					<button type="submit">Save and continue</button>
@@ -448,6 +478,14 @@ function renderTrackingScreen(
 					})}
 				</p>
 			)}
+			<ul>
+				{weeklyBreakdown(data.events, now).map(({ day, workedSec }) => (
+					<li key={day.getTime()}>
+						{day.toLocaleDateString(undefined, { weekday: "short" })}:{" "}
+						{formatDuration(workedSec)}
+					</li>
+				))}
+			</ul>
 			<button
 				type="button"
 				className="toggle-button"
