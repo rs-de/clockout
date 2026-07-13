@@ -104,19 +104,24 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 	let syncStatus: SyncStatus = "idle"
 
 	handle.queueTask(async (signal) => {
+		// An example URL always wins, even over existing real local data —
+		// it's never written to storage, so showing it can't lose anything,
+		// and a user who explicitly opened the link should see it.
+		const exampleId = readExampleIdFromUrl()
+		const example = exampleId ? findExample(exampleId) : undefined
+		if (example) {
+			view = buildExampleView(example)
+			handle.update()
+			return
+		}
+
 		const data = await loadTrackingData()
 		if (signal.aborted) return
 		if (data) {
 			view = { kind: "tracking", data }
 		} else {
-			const exampleId = readExampleIdFromUrl()
-			const example = exampleId ? findExample(exampleId) : undefined
-			if (example) {
-				view = buildExampleView(example)
-			} else {
-				const id = readDocIdFromUrl()
-				view = id ? { kind: "unlock", id } : { kind: "setup" }
-			}
+			const id = readDocIdFromUrl()
+			view = id ? { kind: "unlock", id } : { kind: "setup" }
 		}
 		handle.update()
 	})
@@ -265,7 +270,13 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 
 					<fieldset>
 						<legend>Weekly target</legend>
-						<input name="weeklyHours" type="number" min="0" defaultValue="35" />{" "}
+						<input
+							name="weeklyHours"
+							type="number"
+							min="0"
+							max="168"
+							defaultValue="35"
+						/>{" "}
 						h
 						<input
 							name="weeklyMinutes"
@@ -279,7 +290,14 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 
 					<fieldset>
 						<legend>Daily max</legend>
-						<input name="dailyHours" type="number" min="0" defaultValue="9" /> h
+						<input
+							name="dailyHours"
+							type="number"
+							min="0"
+							max="23"
+							defaultValue="9"
+						/>{" "}
+						h
 						<input
 							name="dailyMinutes"
 							type="number"
@@ -394,6 +412,7 @@ function renderTrackingScreen(
 								name={`day-${i}-hours`}
 								type="number"
 								min="0"
+								max="23"
 								defaultValue="0"
 							/>{" "}
 							h
