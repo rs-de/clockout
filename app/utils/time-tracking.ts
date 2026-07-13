@@ -31,6 +31,12 @@ export function createTrackingData(
 
 export type TrackingSummary = {
 	isRunning: boolean
+	/**
+	 * Unix timestamp (seconds) of the most recent "start" event, whether that
+	 * session is still running or has since stopped. `null` if there's no
+	 * start event at all yet.
+	 */
+	startedAt: number | null
 	dailyWorkedSec: number
 	dailyRemainingSec: number
 	weeklyWorkedSec: number
@@ -58,8 +64,40 @@ function lastEvent(events: TimeEvent[]): TimeEvent | undefined {
 	return [...events].sort((a, b) => a.t - b.t).at(-1)
 }
 
+/** The most recent "start" event, whether that session is still running or has since stopped. */
+function mostRecentStart(events: TimeEvent[]): TimeEvent | undefined {
+	const sorted = [...events].sort((a, b) => a.t - b.t)
+	for (let i = sorted.length - 1; i >= 0; i--) {
+		const event = sorted[i]
+		if (event?.type === "start") return event
+	}
+	return undefined
+}
+
 export function isRunning(events: TimeEvent[]): boolean {
 	return lastEvent(events)?.type === "start"
+}
+
+/** Below this, a start/stop pair is discarded as an accidental tap (requirement #10). */
+export const MIN_SESSION_SEC = 60
+
+/**
+ * Starts if stopped, stops if running. A stop within `MIN_SESSION_SEC` of
+ * its matching start discards the pair entirely — as if the start never
+ * happened — instead of recording a near-zero session.
+ */
+export function toggleTracking(
+	events: TimeEvent[],
+	nowSec: number,
+): TimeEvent[] {
+	const last = lastEvent(events)
+	if (last?.type !== "start") {
+		return [...events, { t: nowSec, type: "start" }]
+	}
+	if (nowSec - last.t < MIN_SESSION_SEC) {
+		return events.filter((event) => event !== last)
+	}
+	return [...events, { t: nowSec, type: "stop" }]
 }
 
 /**
@@ -205,6 +243,7 @@ export function summarize(
 
 	return {
 		isRunning: isRunning(data.events),
+		startedAt: mostRecentStart(data.events)?.t ?? null,
 		dailyWorkedSec,
 		dailyRemainingSec: data.settings.dailyMax * 60 - dailyWorkedSec,
 		weeklyWorkedSec,

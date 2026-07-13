@@ -5,10 +5,10 @@ import {
 	catchupDays,
 	createTrackingData,
 	formatDuration,
-	isRunning,
 	resolveCatchup,
 	summarize,
 	type TrackingData,
+	toggleTracking,
 } from "../utils/time-tracking.ts"
 import {
 	decryptTrackingData,
@@ -167,10 +167,7 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 	}
 
 	async function handleToggle(data: TrackingData) {
-		data.events.push({
-			t: Math.floor(Date.now() / 1000),
-			type: isRunning(data.events) ? "stop" : "start",
-		})
+		data.events = toggleTracking(data.events, Math.floor(Date.now() / 1000))
 		await saveTrackingData(data)
 		handle.update()
 		if (sessionPassword) void syncToServer(data, sessionPassword)
@@ -332,6 +329,15 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 			<div>
 				<p>Week remaining: {formatDuration(summary.weeklyRemainingSec)}</p>
 				<p>Day remaining: {formatDuration(summary.dailyRemainingSec)}</p>
+				{summary.startedAt !== null && (
+					<p>
+						Started at{" "}
+						{new Date(summary.startedAt * 1000).toLocaleTimeString(undefined, {
+							hour: "2-digit",
+							minute: "2-digit",
+						})}
+					</p>
+				)}
 				<button
 					type="button"
 					className="toggle-button"

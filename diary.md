@@ -71,3 +71,9 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 22. Setup form: stateless cross-field validation via setCustomValidity
     `(drop password/passwordRepeat/submitAttempted state; native validity)`
+
+23. Always show the most recent session's start time (req #7)
+    `(add startedAt to TrackingSummary/summarize; render in app.tsx)`
+
+24. Discard start/stop pairs under 1 minute as accidental taps (req #10)
+    `(add toggleTracking/MIN_SESSION_SEC; wire into handleToggle + tests)`

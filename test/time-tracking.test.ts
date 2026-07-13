@@ -8,10 +8,12 @@ import {
 	DEFAULT_WEEKLY_TARGET_MIN,
 	formatDuration,
 	isRunning,
+	MIN_SESSION_SEC,
 	resolveCatchup,
 	startOfWeek,
 	summarize,
 	type TrackingData,
+	toggleTracking,
 	workedSecondsInRange,
 } from "../app/utils/time-tracking.ts"
 
@@ -68,6 +70,30 @@ describe("isRunning", () => {
 			]),
 			false,
 		)
+	})
+})
+
+describe("toggleTracking", () => {
+	test("starts when stopped", () => {
+		assert.deepEqual(toggleTracking([], 100), [{ t: 100, type: "start" }])
+	})
+
+	test("stops when running and the session is at least MIN_SESSION_SEC", () => {
+		const events = [{ t: 0, type: "start" as const }]
+		assert.deepEqual(toggleTracking(events, MIN_SESSION_SEC), [
+			{ t: 0, type: "start" },
+			{ t: MIN_SESSION_SEC, type: "stop" },
+		])
+	})
+
+	test("discards the start instead of recording a session under MIN_SESSION_SEC", () => {
+		const events = [
+			{ t: 0, type: "start" as const },
+			{ t: -100, type: "stop" as const },
+		]
+		assert.deepEqual(toggleTracking(events, MIN_SESSION_SEC - 1), [
+			{ t: -100, type: "stop" },
+		])
 	})
 })
 
@@ -308,13 +334,14 @@ describe("summarize", () => {
 		const summary = summarize(data, new Date(4 * H * 1000))
 
 		assert.equal(summary.isRunning, false)
+		assert.equal(summary.startedAt, 0)
 		assert.equal(summary.dailyWorkedSec, 4 * H)
 		assert.equal(summary.dailyRemainingSec, (9 * 60 + 55) * 60 - 4 * H)
 		assert.equal(summary.weeklyWorkedSec, 4 * H)
 		assert.equal(summary.weeklyRemainingSec, 35 * 60 * 60 - 4 * H)
 	})
 
-	test("reflects an in-progress session live via `now`", () => {
+	test("reflects an in-progress session live via `now`, including its start time", () => {
 		const data: TrackingData = {
 			id: "test-doc",
 			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
@@ -323,6 +350,16 @@ describe("summarize", () => {
 		const summary = summarize(data, new Date(1 * H * 1000))
 
 		assert.equal(summary.isRunning, true)
+		assert.equal(summary.startedAt, 0)
 		assert.equal(summary.dailyWorkedSec, 1 * H)
+	})
+
+	test("startedAt is null when tracking has never started", () => {
+		const data: TrackingData = {
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+			events: [],
+		}
+		assert.equal(summarize(data, new Date(0)).startedAt, null)
 	})
 })
