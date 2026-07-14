@@ -261,6 +261,24 @@ describe("weeklyBreakdown", () => {
 
 		assert.equal(breakdown[0]?.workedSec, 2.5 * H)
 	})
+
+	test("a session forgotten open days ago doesn't bleed fake hours into today's entry", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+			// Tuesday start, never stopped.
+			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
+		]
+		const now = new Date(2026, 6, 17, 9, 30) // Friday, still "running"
+
+		const breakdown = weeklyBreakdown(events, now)
+
+		assert.equal(breakdown[0]?.workedSec, 8 * H) // Monday: real, unaffected
+		assert.equal(breakdown[1]?.workedSec, 0) // Tuesday: stale, pending catch-up
+		assert.equal(breakdown[2]?.workedSec, 0) // Wednesday: stale, pending catch-up
+		assert.equal(breakdown[3]?.workedSec, 0) // Thursday: stale, pending catch-up
+		assert.equal(breakdown[4]?.workedSec, 0) // Friday (today): not real progress
+	})
 })
 
 describe("catchupDays", () => {
@@ -717,5 +735,45 @@ describe("summarize", () => {
 
 		assert.ok(summary.weeklyRemainingSec > 0)
 		assert.equal(summary.dailyRemainingSec, (9 * 60 + 55) * 60)
+	})
+
+	test("excludes a stale open session (started before today) entirely, including its bleed into today", () => {
+		const data: TrackingData = {
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+			events: [
+				// A real, closed Monday: worked normally, should still count.
+				{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" },
+				{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" },
+				// Forgotten open start on Tuesday, still "running" Friday
+				// morning — none of this should count anywhere, including
+				// today, until the user resolves it via catch-up.
+				{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" },
+			],
+		}
+		const summary = summarize(data, new Date(2026, 6, 17, 9, 30))
+
+		assert.equal(summary.dailyWorkedSec, 0)
+		assert.equal(summary.dailyRemainingSec, (9 * 60 + 55) * 60)
+		assert.equal(summary.weeklyWorkedSec, 8 * H)
+		assert.equal(summary.weeklyRemainingSec, 35 * H - 8 * H)
+	})
+
+	test("still counts a session that genuinely started today, even while an earlier gap is unresolved", () => {
+		const data: TrackingData = {
+			id: "test-doc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+			events: [
+				// A closed stop yesterday leaves Wednesday as a plain gap day
+				// (no open session at all) rather than a stale open one.
+				{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" },
+				{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" },
+				// Genuinely started today (Friday) — this is real, live work.
+				{ t: toSec(new Date(2026, 6, 17, 8, 0)), type: "start" },
+			],
+		}
+		const summary = summarize(data, new Date(2026, 6, 17, 9, 30))
+
+		assert.equal(summary.dailyWorkedSec, 1.5 * H)
 	})
 })

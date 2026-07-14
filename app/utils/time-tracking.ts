@@ -324,7 +324,10 @@ export function weeklyBreakdown(
 	return Array.from({ length: 7 }, (_, i) => {
 		const day = addDays(weekStart, i)
 		const dayEnd = addDays(day, 1)
-		return { day, workedSec: workedSecondsInRange(events, day, dayEnd, now) }
+		const workedSec =
+			workedSecondsInRange(events, day, dayEnd, now) -
+			staleOpenSessionOverlap(events, now, day, dayEnd)
+		return { day, workedSec }
 	})
 }
 
@@ -348,6 +351,33 @@ function overlapSeconds(
 	return Math.max(0, overlapEnd - overlapStart)
 }
 
+/**
+ * How much of `rangeStart..rangeEnd` is covered by a still-open session that
+ * began on an earlier calendar day than `now` — a forgotten stop bleeding
+ * forward, not real same-day progress. 0 once there's no open session, or
+ * the open session actually started today (that *is* live, real work).
+ */
+function staleOpenSessionOverlap(
+	events: TimeEvent[],
+	now: Date,
+	rangeStart: Date,
+	rangeEnd: Date,
+): number {
+	const last = lastEvent(events)
+	if (last?.type !== "start") return 0
+
+	const today = startOfDay(now)
+	const openStartDay = startOfDay(new Date(last.t * 1000))
+	if (openStartDay.getTime() >= today.getTime()) return 0
+
+	return overlapSeconds(
+		last.t,
+		Math.floor(now.getTime() / 1000),
+		Math.floor(rangeStart.getTime() / 1000),
+		Math.floor(rangeEnd.getTime() / 1000),
+	)
+}
+
 export function summarize(
 	data: TrackingData,
 	now: Date = new Date(),
@@ -357,18 +387,18 @@ export function summarize(
 	const weekStart = startOfWeek(now)
 	const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-	const dailyWorkedSec = workedSecondsInRange(
-		data.events,
-		dayStart,
-		dayEnd,
-		now,
-	)
-	const weeklyWorkedSec = workedSecondsInRange(
-		data.events,
-		weekStart,
-		weekEnd,
-		now,
-	)
+	// A still-open session that began before today (e.g. a forgotten stop
+	// from days ago) already renders as blank catch-up input fields rather
+	// than a number for its own past days — so its raw, uncorrected elapsed
+	// time shouldn't leak into today's or the week's totals either. Excluded
+	// here, then added back in for real once the user resolves it via the
+	// catch-up form (or, for today, by actually pressing Start).
+	const dailyWorkedSec =
+		workedSecondsInRange(data.events, dayStart, dayEnd, now) -
+		staleOpenSessionOverlap(data.events, now, dayStart, dayEnd)
+	const weeklyWorkedSec =
+		workedSecondsInRange(data.events, weekStart, weekEnd, now) -
+		staleOpenSessionOverlap(data.events, now, weekStart, weekEnd)
 
 	const rawDailyRemainingSec = data.settings.dailyMax * 60 - dailyWorkedSec
 	const weeklyRemainingSec =

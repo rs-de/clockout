@@ -98,3 +98,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 31. Merge catch-up form into the breakdown: any blank day gets inline fields
     `(add weeklyEntryDays; resolveCatchup matches day0 by date; app.tsx)`
+
+32. Exclude a stale (pre-today) open session's bleed from today too
+    `(edit time-tracking.ts: staleOpenSessionOverlap; examples.ts; tests)`

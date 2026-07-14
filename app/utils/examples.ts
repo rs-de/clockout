@@ -31,7 +31,11 @@ export const EXAMPLES: Example[] = [
 			"An open session from a few days ago that was never stopped — shows the catch-up form.",
 		pretendWeekday: 4, // Friday
 		pretendTime: "09:30",
-		events: [{ daysAgo: 3, time: "09:15", type: "start" }],
+		events: [
+			{ daysAgo: 4, time: "09:00", type: "start" }, // Monday, worked normally
+			{ daysAgo: 4, time: "17:00", type: "stop" },
+			{ daysAgo: 3, time: "09:00", type: "start" }, // Tuesday, never stopped
+		],
 	},
 	{
 		id: "lunch-break",
