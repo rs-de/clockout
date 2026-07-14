@@ -18,11 +18,12 @@ Lean app for time tracking, so you can see how much work is still left
    later stop/restart (e.g. a lunch break).
 8. Data should be redundancy-free and compact (timestamps). Everything is
    derived from the event data resp. calculated on-the-fly.
-9. If the last event (start or stop) is not from today, the user likely
-   missed tracking one or more days. Show one row per missing day — the day
-   of an unfinished start (inclusive), or the day after the last stop,
-   through yesterday — so the user can enter the hours worked that day, or
-   check "did not work" to explicitly mark it as a day with no hours.
+9. The always-visible weekly breakdown (Monday..Sunday) shows each day's
+   booked time as plain text — except any past day this week with nothing
+   booked yet (an unfinished start, the days after a last stop, or simply
+   never touched, e.g. before the first-ever tracked event), which instead
+   shows input fields for the hours worked plus a "did not work" checkbox to
+   explicitly mark it as a day with no hours.
 10. A start/stop pair shorter than 1 minute is discarded (not tracked, as
     if the start never happened) — most likely an accidental tap.
 11. An "About this app" page links to a few named examples (e.g. "forgot to

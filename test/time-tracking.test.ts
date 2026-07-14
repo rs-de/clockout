@@ -16,6 +16,7 @@ import {
 	type TrackingData,
 	toggleTracking,
 	weeklyBreakdown,
+	weeklyEntryDays,
 	workedSecondsInRange,
 } from "../app/utils/time-tracking.ts"
 
@@ -331,6 +332,89 @@ describe("catchupDays", () => {
 			{ t: toSec(new Date(2026, 6, 11)), type: "skipDay" as const },
 		]
 		assert.deepEqual(catchupDays(events, new Date(2026, 6, 12, 8, 0)), [])
+	})
+})
+
+describe("weeklyEntryDays", () => {
+	test("empty for a document with no events at all yet", () => {
+		assert.deepEqual(weeklyEntryDays([], new Date(2026, 6, 16, 10, 0)), [])
+	})
+
+	test("includes days before the very first tracked event, within the current week", () => {
+		// First-ever event is Wednesday - Monday and Tuesday have nothing at
+		// all, which catchupDays alone wouldn't catch (it only looks forward
+		// from the last event).
+		const events = [
+			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 15, 17, 0)), type: "stop" as const },
+		]
+		const now = new Date(2026, 6, 16, 10, 0) // Thursday
+
+		const days = weeklyEntryDays(events, now)
+
+		assert.deepEqual(
+			days.map((d) => d.getTime()),
+			[13, 14].map((date) => new Date(2026, 6, date).getTime()),
+		)
+	})
+
+	test("catches an isolated untouched day in the middle of an otherwise-fine week", () => {
+		// Worked Monday, nothing Tuesday, worked Wednesday - catchupDays sees
+		// no unresolved gap at all (Wednesday's stop is only "yesterday"
+		// relative to Thursday), but Tuesday is still genuinely blank.
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 15, 17, 0)), type: "stop" as const },
+		]
+		const now = new Date(2026, 6, 16, 10, 0) // Thursday
+
+		assert.deepEqual(catchupDays(events, now), [])
+		assert.deepEqual(
+			weeklyEntryDays(events, now).map((d) => d.getTime()),
+			[new Date(2026, 6, 14).getTime()],
+		)
+	})
+
+	test("excludes a day with real worked hours or an explicit skipDay marker", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 14)), type: "skipDay" as const },
+		]
+		const now = new Date(2026, 6, 16, 10, 0) // Thursday
+
+		assert.deepEqual(
+			weeklyEntryDays(events, now).map((d) => d.getTime()),
+			[new Date(2026, 6, 15).getTime()], // only Wednesday is genuinely blank
+		)
+	})
+
+	test("excludes today and future days", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+		]
+		const now = new Date(2026, 6, 14, 10, 0) // Tuesday
+
+		assert.deepEqual(weeklyEntryDays(events, now), [])
+	})
+
+	test("returns the classic gap days plus surrounding blank days, all in chronological order", () => {
+		// Monday and Tuesday blank, then an open start Wednesday never
+		// stopped (catchupDays covers Wed+Thu; the blank-day scan fills in
+		// Mon+Tue, which catchupDays alone wouldn't reach).
+		const wedStart = toSec(new Date(2026, 6, 15, 9, 0))
+		const events = [{ t: wedStart, type: "start" as const }]
+		const now = new Date(2026, 6, 17, 10, 0) // Friday
+
+		const days = weeklyEntryDays(events, now)
+
+		assert.deepEqual(
+			days.map((d) => d.getTime()),
+			[13, 14, 15, 16].map((date) => new Date(2026, 6, date).getTime()),
+		)
 	})
 })
 

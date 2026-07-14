@@ -137,6 +137,43 @@ export function catchupDays(events: TimeEvent[], now: Date): Date[] {
 	return days
 }
 
+/**
+ * Every day of the current week (Monday..yesterday) that needs explicit
+ * backfilling: the classic gap from `catchupDays`, plus any other day this
+ * week with no events overlapping it at all — e.g. a Monday before the very
+ * first thing ever tracked, which `catchupDays` alone wouldn't catch since
+ * it only looks forward from the last event. Always chronological, so
+ * `resolveCatchup`'s day-identity matching lines up. Empty for a document
+ * with no events yet at all — a brand-new setup shouldn't immediately
+ * demand backfilling days nobody has touched yet.
+ */
+export function weeklyEntryDays(events: TimeEvent[], now: Date): Date[] {
+	if (events.length === 0) return []
+
+	const gapDays = catchupDays(events, now)
+	const gapDaySet = new Set(gapDays.map((day) => day.getTime()))
+
+	const today = startOfDay(now)
+	const blankDays: Date[] = []
+	for (
+		let day = startOfWeek(now);
+		day.getTime() < today.getTime();
+		day = addDays(day, 1)
+	) {
+		if (gapDaySet.has(day.getTime())) continue
+		const dayEnd = addDays(day, 1)
+		const workedSec = workedSecondsInRange(events, day, dayEnd, now)
+		const hasSkipMarker = events.some(
+			(event) =>
+				event.type === "skipDay" &&
+				startOfDay(new Date(event.t * 1000)).getTime() === day.getTime(),
+		)
+		if (workedSec === 0 && !hasSkipMarker) blankDays.push(day)
+	}
+
+	return [...gapDays, ...blankDays].sort((a, b) => a.getTime() - b.getTime())
+}
+
 function addDays(day: Date, count: number): Date {
 	const result = new Date(day)
 	result.setDate(result.getDate() + count)
@@ -172,21 +209,25 @@ export function resolveRelativeEvents(
 
 /**
  * Backfills the days from requirement #9. `days` must be
- * `catchupDays(events, now)` and `workedMinutesPerDay` aligned to it. If the
- * last event is a still-open start, its exact timestamp is kept and only its
- * missing stop is added (at start + duration) for `days[0]` — even if 0
- * minutes, since that dangling start must be closed somehow regardless.
- * Every other day with minutes > 0 gets a fresh start/stop pair, anchored at
- * local midnight *or* right after the previous day's session ends, whichever
- * is later — so a day entered with enough hours to run past midnight (e.g. a
+ * `weeklyEntryDays(events, now)` (or `catchupDays`) and `workedMinutesPerDay`
+ * aligned to it, in chronological order. If the last event is a still-open
+ * start, whichever entry in `days` matches *that start's own calendar day*
+ * keeps its exact timestamp and only gets its missing stop added (at start +
+ * duration) — even if 0 minutes, since that dangling start must be closed
+ * somehow regardless. Matching by date rather than always assuming index 0
+ * means an earlier, otherwise-untouched day (e.g. a Monday before the very
+ * first thing ever tracked) can safely appear before it in `days`. Every
+ * other day with minutes > 0 gets a fresh start/stop pair, anchored at local
+ * midnight *or* right after the previous day's session ends, whichever is
+ * later — so a day entered with enough hours to run past midnight (e.g. a
  * forgotten start at 08:00 plus 20h) still credits its full duration instead
  * of getting clamped, and the next day's session is chained after it instead
  * of overlapping it (see the regression test: a naive midnight anchor would
  * make the two sessions interleave, which breaks workedSecondsInRange's
  * single-open-start assumption and silently discards most of both days'
  * hours). Every other day entered as 0 gets an explicit "skipDay" marker
- * instead — not just the last one — so "no work today" is recorded
- * unambiguously and a fresh `catchupDays` call afterwards never re-opens it.
+ * instead, so "no work today" is recorded unambiguously and a fresh
+ * `weeklyEntryDays` call afterwards never re-opens it.
  */
 export function resolveCatchup(
 	events: TimeEvent[],
@@ -197,7 +238,8 @@ export function resolveCatchup(
 	const last = lastEvent(events)
 	if (!last) return events
 
-	const preserveOpenStart = last.type === "start"
+	const openStartDay =
+		last.type === "start" ? startOfDay(new Date(last.t * 1000)).getTime() : null
 	const result = [...events]
 	let cursorSec: number | null = null // earliest the next session may start
 
@@ -205,7 +247,7 @@ export function resolveCatchup(
 		const minutes = workedMinutesPerDay[i] ?? 0
 		const dayStartSec = Math.floor(day.getTime() / 1000)
 
-		if (i === 0 && preserveOpenStart) {
+		if (openStartDay !== null && day.getTime() === openStartDay) {
 			const stopSec = last.t + minutes * 60
 			result.push({ t: stopSec, type: "stop" })
 			cursorSec = stopSec

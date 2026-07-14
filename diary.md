@@ -95,3 +95,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 30. Always show a per-day weekly breakdown; add "did not work" checkbox
     `(add weeklyBreakdown + skipDay event type; wire checkbox in app.tsx)`
+
+31. Merge catch-up form into the breakdown: any blank day gets inline fields
+    `(add weeklyEntryDays; resolveCatchup matches day0 by date; app.tsx)`

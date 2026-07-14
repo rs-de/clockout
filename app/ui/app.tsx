@@ -8,7 +8,6 @@ import {
 } from "../utils/examples.ts"
 import { loadTrackingData, saveTrackingData } from "../utils/local-store.ts"
 import {
-	catchupDays,
 	createTrackingData,
 	formatDuration,
 	resolveCatchup,
@@ -16,6 +15,7 @@ import {
 	type TrackingData,
 	toggleTracking,
 	weeklyBreakdown,
+	weeklyEntryDays,
 } from "../utils/time-tracking.ts"
 import {
 	decryptTrackingData,
@@ -399,70 +399,65 @@ function renderTrackingScreen(
 	banner?: RemixNode,
 	footer?: RemixNode,
 ) {
-	const days = catchupDays(data.events, now)
-
-	if (days.length > 0) {
-		return (
-			<div>
-				{banner}
-				<form
-					mix={on("submit", (event) => {
-						event.preventDefault()
-						onCatchupSubmit(days, new FormData(event.currentTarget))
-					})}
-				>
-					<h1>clockout</h1>
-					<p>
-						Looks like tracking wasn't running on some past days. Enter how many
-						hours you worked on each day since then.
-					</p>
-					{days.map((day, i) => (
-						<fieldset key={day.getTime()}>
-							<legend>
-								{day.toLocaleDateString(undefined, {
-									weekday: "short",
-									day: "2-digit",
-									month: "2-digit",
-								})}
-							</legend>
-							<input
-								name={`day-${i}-hours`}
-								type="number"
-								min="0"
-								max="23"
-								defaultValue="0"
-							/>{" "}
-							h
-							<input
-								name={`day-${i}-minutes`}
-								type="number"
-								min="0"
-								max="59"
-								defaultValue="0"
-							/>{" "}
-							m
-							<label>
-								<input
-									name={`day-${i}-skip`}
-									type="checkbox"
-									mix={on("change", (event) => {
-										toggleCatchupDayFields(
-											event.currentTarget.closest("fieldset"),
-											event.currentTarget.checked,
-										)
-									})}
-								/>{" "}
-								Did not work
-							</label>
-						</fieldset>
-					))}
-					<button type="submit">Save and continue</button>
-				</form>
-			</div>
-		)
-	}
-
+	const entryDays = weeklyEntryDays(data.events, now)
+	const entryDayIndex = new Map(entryDays.map((day, i) => [day.getTime(), i]))
 	const summary = summarize(data, now)
+
+	const weekList = weeklyBreakdown(data.events, now).map(
+		({ day, workedSec }) => {
+			const label = day.toLocaleDateString(undefined, {
+				weekday: "short",
+				day: "2-digit",
+				month: "2-digit",
+			})
+			const i = entryDayIndex.get(day.getTime())
+
+			if (i === undefined) {
+				return (
+					<li key={day.getTime()}>
+						{label}: {formatDuration(workedSec)}
+					</li>
+				)
+			}
+
+			return (
+				<li key={day.getTime()}>
+					<fieldset>
+						<legend>{label}</legend>
+						<input
+							name={`day-${i}-hours`}
+							type="number"
+							min="0"
+							max="23"
+							defaultValue="0"
+						/>{" "}
+						h
+						<input
+							name={`day-${i}-minutes`}
+							type="number"
+							min="0"
+							max="59"
+							defaultValue="0"
+						/>{" "}
+						m
+						<label>
+							<input
+								name={`day-${i}-skip`}
+								type="checkbox"
+								mix={on("change", (event) => {
+									toggleCatchupDayFields(
+										event.currentTarget.closest("fieldset"),
+										event.currentTarget.checked,
+									)
+								})}
+							/>{" "}
+							Did not work
+						</label>
+					</fieldset>
+				</li>
+			)
+		},
+	)
 
 	return (
 		<div>
@@ -478,14 +473,23 @@ function renderTrackingScreen(
 					})}
 				</p>
 			)}
-			<ul>
-				{weeklyBreakdown(data.events, now).map(({ day, workedSec }) => (
-					<li key={day.getTime()}>
-						{day.toLocaleDateString(undefined, { weekday: "short" })}:{" "}
-						{formatDuration(workedSec)}
-					</li>
-				))}
-			</ul>
+			{entryDays.length > 0 ? (
+				<form
+					mix={on("submit", (event) => {
+						event.preventDefault()
+						onCatchupSubmit(entryDays, new FormData(event.currentTarget))
+					})}
+				>
+					<p>
+						Some days this week have no tracked hours yet. Enter how many hours
+						you worked, or check "Did not work".
+					</p>
+					<ul>{weekList}</ul>
+					<button type="submit">Save hours</button>
+				</form>
+			) : (
+				<ul>{weekList}</ul>
+			)}
 			<button
 				type="button"
 				className="toggle-button"
