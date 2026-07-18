@@ -12,9 +12,15 @@ export type TimeEvent = {
 	type: TimeEventType
 }
 
+/** How dates/times are displayed. Optional so a document persisted before
+ * this setting existed just keeps its original "auto" (browser-locale)
+ * display instead of silently changing. */
+export type DateFormat = "de" | "iso" | "auto"
+
 export type TrackingSettings = {
 	weeklyTargetMin: number
 	dailyMax: number
+	dateFormat?: DateFormat
 }
 
 export type TrackingData = {
@@ -24,10 +30,13 @@ export type TrackingData = {
 	events: TimeEvent[]
 }
 
+export const DEFAULT_DATE_FORMAT: DateFormat = "de"
+
 export function createTrackingData(
 	settings: TrackingSettings = {
 		weeklyTargetMin: DEFAULT_WEEKLY_TARGET_MIN,
 		dailyMax: DEFAULT_DAILY_MAX,
+		dateFormat: DEFAULT_DATE_FORMAT,
 	},
 ): TrackingData {
 	return { id: nanoid(), settings, events: [] }

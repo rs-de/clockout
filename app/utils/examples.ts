@@ -1,5 +1,6 @@
 import {
 	DEFAULT_DAILY_MAX,
+	DEFAULT_DATE_FORMAT,
 	DEFAULT_WEEKLY_TARGET_MIN,
 	type RelativeEvent,
 	resolveRelativeEvents,
@@ -101,6 +102,7 @@ export function buildExampleData(
 		settings: {
 			weeklyTargetMin: DEFAULT_WEEKLY_TARGET_MIN,
 			dailyMax: DEFAULT_DAILY_MAX,
+			dateFormat: DEFAULT_DATE_FORMAT,
 		},
 		events: resolveRelativeEvents(example.events, pretendNow),
 	}

@@ -101,3 +101,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 32. Exclude a stale (pre-today) open session's bleed from today too
     `(edit time-tracking.ts: staleOpenSessionOverlap; examples.ts; tests)`
+
+33. Add configurable dateFormat (de/iso/auto) to setup form, default "de"
+    `(add date-format.ts; dateFormat in TrackingSettings; setup <select>)`

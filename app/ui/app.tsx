@@ -1,6 +1,11 @@
 import { clientEntry, type Handle, on, type RemixNode } from "remix/ui"
 
 import {
+	formatClockTime,
+	formatDayMonth,
+	formatWeekdayName,
+} from "../utils/date-format.ts"
+import {
 	buildExampleData,
 	type Example,
 	findExample,
@@ -9,6 +14,7 @@ import {
 import { loadTrackingData, saveTrackingData } from "../utils/local-store.ts"
 import {
 	createTrackingData,
+	type DateFormat,
 	formatDuration,
 	resolveCatchup,
 	summarize,
@@ -171,6 +177,7 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 		const data = createTrackingData({
 			weeklyTargetMin: readMinutes(formData, "weeklyHours", "weeklyMinutes"),
 			dailyMax: readMinutes(formData, "dailyHours", "dailyMinutes"),
+			dateFormat: (formData.get("dateFormat") as DateFormat | null) ?? "de",
 		})
 		await saveTrackingData(data)
 		sessionPassword = String(formData.get("password") ?? "")
@@ -326,6 +333,15 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 					</fieldset>
 
 					<label>
+						Date format
+						<select name="dateFormat" defaultValue="de">
+							<option value="de">German (17.07.2026, 24h)</option>
+							<option value="iso">ISO 8601 (2026-07-17, 24h)</option>
+							<option value="auto">Browser default</option>
+						</select>
+					</label>
+
+					<label>
 						Password
 						<input
 							name="password"
@@ -380,12 +396,9 @@ export const App = clientEntry(import.meta.url, function App(handle: Handle) {
 			(days, formData) => handleExampleCatchupSubmit(data, days, formData),
 			<p role="status">
 				Demo: simulating "{example.title}" —{" "}
-				{now.toLocaleString(undefined, {
-					weekday: "long",
-					hour: "2-digit",
-					minute: "2-digit",
-				})}
-				. Nothing here is saved. <a href="/about">Back to examples</a>
+				{formatWeekdayName(now, data.settings.dateFormat, "long")},{" "}
+				{formatClockTime(now, data.settings.dateFormat)}. Nothing here is saved.{" "}
+				<a href="/about">Back to examples</a>
 			</p>,
 		)
 	}
@@ -405,11 +418,7 @@ function renderTrackingScreen(
 
 	const weekList = weeklyBreakdown(data.events, now).map(
 		({ day, workedSec }) => {
-			const label = day.toLocaleDateString(undefined, {
-				weekday: "short",
-				day: "2-digit",
-				month: "2-digit",
-			})
+			const label = `${formatWeekdayName(day, data.settings.dateFormat, "short")}, ${formatDayMonth(day, data.settings.dateFormat)}`
 			const i = entryDayIndex.get(day.getTime())
 
 			if (i === undefined) {
@@ -467,10 +476,10 @@ function renderTrackingScreen(
 			{summary.startedAt !== null && (
 				<p>
 					Started at{" "}
-					{new Date(summary.startedAt * 1000).toLocaleTimeString(undefined, {
-						hour: "2-digit",
-						minute: "2-digit",
-					})}
+					{formatClockTime(
+						new Date(summary.startedAt * 1000),
+						data.settings.dateFormat,
+					)}
 				</p>
 			)}
 			{entryDays.length > 0 ? (
