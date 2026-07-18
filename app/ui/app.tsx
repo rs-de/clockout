@@ -454,7 +454,7 @@ function renderTrackingScreen(
 
 			if (i === undefined) {
 				return (
-					<li key={day.getTime()}>
+					<li key={day.getTime()} className="data-row">
 						{label}: {formatDuration(workedSec)}
 					</li>
 				)

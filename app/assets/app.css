@@ -26,6 +26,10 @@ body {
 	font-family: system-ui, sans-serif;
 }
 
+.data-row {
+	font-family: ui-monospace, monospace;
+}
+
 .toggle-button {
 	min-width: 44px;
 	min-height: 44px;

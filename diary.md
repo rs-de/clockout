@@ -113,3 +113,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 36. Translate example titles (About page links, demo banner)
     `(t(example.title) in about.tsx/app.tsx; extract EXAMPLES in sync script)`
+
+37. Use a fixed-width font for the read-only weekly data rows
+    `(add .data-row class in app.css; apply in app.tsx breakdown list)`
