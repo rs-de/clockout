@@ -78,6 +78,25 @@ function lastEvent(events: TimeEvent[]): TimeEvent | undefined {
 }
 
 /**
+ * The still-open "start" event, if any — found by walking events
+ * chronologically and pairing start/stop, ignoring "skipDay" markers
+ * (already defined to be pure no-ops for session purposes, see
+ * `workedSecondsInRange`). Unlike checking whether the single most-recent
+ * event is a "start", this keeps finding a dangling start even after a
+ * later day gets its own skipDay marker from a partial catch-up save — so
+ * an earlier, still-unresolved day doesn't go invisible just because
+ * something after it, chronologically, got resolved first.
+ */
+function danglingStart(events: TimeEvent[]): TimeEvent | undefined {
+	let open: TimeEvent | undefined
+	for (const event of [...events].sort((a, b) => a.t - b.t)) {
+		if (event.type === "start") open = event
+		else if (event.type === "stop") open = undefined
+	}
+	return open
+}
+
+/**
  * The first "start" event of `now`'s calendar day, if any — stays fixed
  * across a lunch-break-style stop/restart instead of jumping to whichever
  * start happened most recently.
@@ -97,7 +116,7 @@ function firstStartToday(
 }
 
 export function isRunning(events: TimeEvent[]): boolean {
-	return lastEvent(events)?.type === "start"
+	return danglingStart(events) !== undefined
 }
 
 /** Below this, a start/stop pair is discarded as an accidental tap (requirement #10). */
@@ -127,7 +146,12 @@ export function toggleTracking(
  * to back-fill because nothing was tracked for them: either an unfinished
  * open start's own day, or — if the last event is a clean stop — the days
  * after it with no events at all. Runs through yesterday; empty if the last
- * event is already from today (or there is no last event).
+ * event is already from today (or there is no last event). Always includes
+ * a still-open start's own day even if it's no longer the most recent event
+ * overall — e.g. after a partial catch-up save records a skipDay marker for
+ * a later day while the dangling start itself is left unanswered, it must
+ * keep demanding an answer rather than going invisible just because
+ * something after it, chronologically, got resolved first.
  */
 export function catchupDays(events: TimeEvent[], now: Date): Date[] {
 	const last = lastEvent(events)
@@ -135,15 +159,28 @@ export function catchupDays(events: TimeEvent[], now: Date): Date[] {
 
 	const today = startOfDay(now)
 	const lastDay = startOfDay(new Date(last.t * 1000))
-	if (lastDay.getTime() >= today.getTime()) return []
 
 	const days: Date[] = []
-	let day = last.type === "start" ? lastDay : addDays(lastDay, 1)
-	while (day.getTime() < today.getTime()) {
-		days.push(day)
-		day = addDays(day, 1)
+	if (lastDay.getTime() < today.getTime()) {
+		let day = last.type === "start" ? lastDay : addDays(lastDay, 1)
+		while (day.getTime() < today.getTime()) {
+			days.push(day)
+			day = addDays(day, 1)
+		}
 	}
-	return days
+
+	const dangling = danglingStart(events)
+	if (dangling) {
+		const danglingDay = startOfDay(new Date(dangling.t * 1000))
+		if (
+			danglingDay.getTime() < today.getTime() &&
+			!days.some((day) => day.getTime() === danglingDay.getTime())
+		) {
+			days.unshift(danglingDay)
+		}
+	}
+
+	return days.sort((a, b) => a.getTime() - b.getTime())
 }
 
 /**
@@ -171,7 +208,9 @@ export function weeklyEntryDays(events: TimeEvent[], now: Date): Date[] {
 	) {
 		if (gapDaySet.has(day.getTime())) continue
 		const dayEnd = addDays(day, 1)
-		const workedSec = workedSecondsInRange(events, day, dayEnd, now)
+		const workedSec =
+			workedSecondsInRange(events, day, dayEnd, now) -
+			staleOpenSessionOverlap(events, now, day, dayEnd)
 		const hasOwnDayEvent = events.some(
 			(event) =>
 				startOfDay(new Date(event.t * 1000)).getTime() === day.getTime(),
@@ -219,28 +258,44 @@ export function resolveRelativeEvents(
  * Backfills the days from requirement #9. `days` must be
  * `weeklyEntryDays(events, now)` (or `catchupDays`), with
  * `workedMinutesPerDay` and `skipDayFlags` aligned to it, in chronological
- * order. If the last event is a still-open start, whichever entry in `days`
- * matches *that start's own calendar day* keeps its exact timestamp and only
- * gets its missing stop added (at start + duration) — even if 0 minutes,
- * since that dangling start must be closed somehow regardless. Matching by
- * date rather than always assuming index 0 means an earlier,
- * otherwise-untouched day (e.g. a Monday before the very first thing ever
- * tracked) can safely appear before it in `days`. Every other day with
- * minutes > 0 gets a fresh start/stop pair, anchored at local midnight *or*
- * right after the previous day's session ends, whichever is later — so a day
- * entered with enough hours to run past midnight (e.g. a forgotten start at
- * 08:00 plus 20h) still credits its full duration instead of getting
- * clamped, and the next day's session is chained after it instead of
- * overlapping it (see the regression test: a naive midnight anchor would
- * make the two sessions interleave, which breaks workedSecondsInRange's
- * single-open-start assumption and silently discards most of both days'
- * hours). Every other day with 0 minutes and its `skipDayFlags` entry set
- * gets an explicit "skipDay" marker instead, so "no work today" is recorded
- * unambiguously and a fresh `weeklyEntryDays` call afterwards never re-opens
- * it. A day left at 0 minutes *without* its skip flag set is left
- * completely untouched — the user never answered for it, so it stays
- * pending rather than being silently recorded as "no work" just because it
- * shares a form with days that were answered.
+ * order.
+ *
+ * Every day — including a still-open start's own day — is resolved only if
+ * it's actually answered (real minutes, or the skip flag). An unanswered
+ * day (0 minutes, no skip) is left completely untouched, so it stays
+ * pending for a later save instead of being silently recorded as "no work"
+ * just because it shares a form with days that were answered. This applies
+ * uniformly, including the dangling start's own day, so a user who only
+ * means to answer a later day (e.g. checking "no work" for Wednesday) can
+ * leave an earlier, still-unresolved day (e.g. a session forgotten open
+ * since Tuesday) for a later save.
+ *
+ * The one exception: if a *later* day is given real minutes while the
+ * dangling start's own day is still unanswered, the dangling start gets
+ * closed first (0 duration, at its exact original timestamp) before that
+ * later day's fresh session opens — otherwise the two sessions would
+ * collide (the later "start" would silently become "the" open session in
+ * any single-open-start bookkeeping, orphaning the original dangling event
+ * with no stop, ever). A "no work" skip flag on a later day never triggers
+ * this, since a skipDay marker is a pure no-op that can't collide with
+ * anything.
+ *
+ * Whichever day actually closes the dangling start — whether answered
+ * directly or force-closed by a later real day — keeps its exact original
+ * timestamp, and only gets its missing stop added.
+ *
+ * Every other answered day with minutes > 0 gets a fresh start/stop pair,
+ * anchored at local midnight *or* right after the previous day's session
+ * ends, whichever is later — so a day entered with enough hours to run past
+ * midnight (e.g. a forgotten start at 08:00 plus 20h) still credits its
+ * full duration instead of getting clamped, and the next day's session is
+ * chained after it instead of overlapping it (see the regression test: a
+ * naive midnight anchor would make the two sessions interleave, which
+ * breaks workedSecondsInRange's single-open-start assumption and silently
+ * discards most of both days' hours). Every other answered day with 0
+ * minutes gets an explicit "skipDay" marker instead, so "no work today" is
+ * recorded unambiguously and a fresh `weeklyEntryDays` call afterwards
+ * never re-opens it.
  */
 export function resolveCatchup(
 	events: TimeEvent[],
@@ -249,33 +304,43 @@ export function resolveCatchup(
 	skipDayFlags: boolean[],
 ): TimeEvent[] {
 	if (days.length === 0) return events
-	const last = lastEvent(events)
-	if (!last) return events
 
-	const openStartDay =
-		last.type === "start" ? startOfDay(new Date(last.t * 1000)).getTime() : null
+	const dangling = danglingStart(events)
+	const danglingDayTime = dangling
+		? startOfDay(new Date(dangling.t * 1000)).getTime()
+		: undefined
+	let danglingClosed = false
 	const result = [...events]
 	let cursorSec: number | null = null // earliest the next session may start
 
 	days.forEach((day, i) => {
 		const minutes = workedMinutesPerDay[i] ?? 0
+		const skip = skipDayFlags[i] ?? false
 		const dayStartSec = Math.floor(day.getTime() / 1000)
 
-		if (openStartDay !== null && day.getTime() === openStartDay) {
-			const stopSec = last.t + minutes * 60
-			result.push({ t: stopSec, type: "stop" })
-			cursorSec = stopSec
+		if (dangling && day.getTime() === danglingDayTime) {
+			if (minutes > 0 || skip) {
+				const stopSec = dangling.t + minutes * 60
+				result.push({ t: stopSec, type: "stop" })
+				cursorSec = stopSec
+				danglingClosed = true
+			}
 			return
 		}
 
 		if (minutes > 0) {
+			if (dangling && !danglingClosed) {
+				result.push({ t: dangling.t, type: "stop" })
+				cursorSec = dangling.t
+				danglingClosed = true
+			}
 			const startSec =
 				cursorSec !== null ? Math.max(cursorSec, dayStartSec) : dayStartSec
 			const stopSec = startSec + minutes * 60
 			result.push({ t: startSec, type: "start" })
 			result.push({ t: stopSec, type: "stop" })
 			cursorSec = stopSec
-		} else if (skipDayFlags[i]) {
+		} else if (skip) {
 			result.push({ t: dayStartSec, type: "skipDay" })
 		}
 	})
@@ -377,15 +442,15 @@ function staleOpenSessionOverlap(
 	rangeStart: Date,
 	rangeEnd: Date,
 ): number {
-	const last = lastEvent(events)
-	if (last?.type !== "start") return 0
+	const dangling = danglingStart(events)
+	if (!dangling) return 0
 
 	const today = startOfDay(now)
-	const openStartDay = startOfDay(new Date(last.t * 1000))
+	const openStartDay = startOfDay(new Date(dangling.t * 1000))
 	if (openStartDay.getTime() >= today.getTime()) return 0
 
 	return overlapSeconds(
-		last.t,
+		dangling.t,
 		Math.floor(now.getTime() / 1000),
 		Math.floor(rangeStart.getTime() / 1000),
 		Math.floor(rangeEnd.getTime() / 1000),

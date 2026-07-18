@@ -122,3 +122,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 39. Add a permanent Playwright e2e suite (adopts the new global standard)
     `(pnpm add -D playwright @playwright/test; config + tests/e2e.spec.ts)`
+
+40. Fix: skipping a later catch-up day no longer force-resolves an earlier
+    `(edit time-tracking.ts: danglingStart() replaces lastEvent checks; tests)`

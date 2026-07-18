@@ -468,11 +468,13 @@ describe("resolveCatchup", () => {
 		const day11Start = toSec(new Date(2026, 6, 11))
 		const day13Start = toSec(new Date(2026, 6, 13))
 
-		// day 10 (open start, 0min): marker stop only, closing the real
-		// dangling start, regardless of any skip flag. day 11 (120min): full
-		// pair. day 12 (0min, not skipped): the user never answered for it,
-		// so nothing is pushed - it stays pending. day 13 (0min, explicitly
-		// skipped): skipDay marker.
+		// day 10 (open start, 0min, not skipped): left unanswered on its own,
+		// but day 11 needs a fresh session, so day 10's dangling start gets
+		// force-closed first (0 duration) to avoid the two sessions
+		// colliding - same resulting timestamps as if it'd been answered
+		// directly. day 11 (120min): full pair. day 12 (0min, not skipped):
+		// the user never answered for it, so nothing is pushed - it stays
+		// pending. day 13 (0min, explicitly skipped): skipDay marker.
 		assert.deepEqual(
 			resolveCatchup(events, days, [0, 120, 0, 0], [false, false, false, true]),
 			[
@@ -609,6 +611,99 @@ describe("resolveCatchup", () => {
 		// interleaving bug produced, nor a clamped ~56h.
 		assert.equal(summary.weeklyWorkedSec, 60 * H)
 		assert.equal(summary.weeklyRemainingSec, -25 * H)
+	})
+
+	test("leaves the dangling start's own day untouched when only a later day is answered with a skip flag", () => {
+		// Regression for: checking "Did not work" for a later day (e.g.
+		// Wednesday) and saving must not silently resolve an earlier,
+		// still-unanswered dangling start (e.g. Tuesday) as "0 hours" - a
+		// skipDay marker is a pure no-op, so it can never force-close it.
+		const startTs = toSec(new Date(2026, 6, 14, 9, 0)) // Tuesday 09:00
+		const events = [{ t: startTs, type: "start" as const }]
+		const days = [new Date(2026, 6, 14), new Date(2026, 6, 15)] // Tue, Wed
+
+		const resolved = resolveCatchup(events, days, [0, 0], [false, true])
+
+		assert.deepEqual(resolved, [
+			{ t: startTs, type: "start" }, // Tuesday's dangling start, untouched
+			{ t: toSec(new Date(2026, 6, 15)), type: "skipDay" }, // Wednesday
+		])
+		assert.equal(isRunning(resolved), true)
+	})
+
+	test("a partial save keeps demanding the dangling day's own answer, and a later save resolves it with real hours at its original timestamp", () => {
+		// Mirrors the "forgot-stop" example: Monday worked normally, Tuesday
+		// started but was never stopped.
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
+		]
+		const tueStartTs = toSec(new Date(2026, 6, 14, 9, 0))
+		const now = new Date(2026, 6, 17, 9, 30) // Friday
+
+		// Round 1: only answer Wednesday ("Did not work"), leave Tuesday and
+		// Thursday unanswered.
+		const days1 = weeklyEntryDays(events, now)
+		assert.deepEqual(
+			days1.map((d) => d.getTime()),
+			[14, 15, 16].map((date) => new Date(2026, 6, date).getTime()),
+		)
+		const round1 = resolveCatchup(
+			events,
+			days1,
+			[0, 0, 0],
+			[false, true, false],
+		)
+
+		// Tuesday's dangling start is still open, so it - and Thursday - must
+		// still be pending, even though Wednesday is chronologically after
+		// both of them.
+		const days2 = weeklyEntryDays(round1, now)
+		assert.deepEqual(
+			days2.map((d) => d.getTime()),
+			[14, 16].map((date) => new Date(2026, 6, date).getTime()),
+		)
+
+		// Round 2: now answer Tuesday with real hours.
+		const round2 = resolveCatchup(round1, days2, [360, 0], [false, false])
+
+		assert.deepEqual(round2, [
+			...events.slice(0, 2), // Monday's pair, untouched
+			{ t: tueStartTs, type: "start" }, // original timestamp preserved
+			{ t: toSec(new Date(2026, 6, 15)), type: "skipDay" }, // from round 1
+			{ t: tueStartTs + 360 * 60, type: "stop" }, // added in round 2
+		])
+		assert.equal(isRunning(round2), false)
+		// Thursday alone remains pending.
+		assert.deepEqual(
+			weeklyEntryDays(round2, now).map((d) => d.getTime()),
+			[new Date(2026, 6, 16).getTime()],
+		)
+	})
+
+	test("a partial skip on a later day doesn't let a stale dangling session bleed into other still-blank days", () => {
+		// Monday's session was never stopped; Wednesday gets answered first
+		// ("Did not work"), leaving Tuesday (blank) and the Monday dangling
+		// day both still needing an answer. Tuesday must read as genuinely
+		// blank (0 worked seconds), not inflated by Monday's stale bleed.
+		const startTs = toSec(new Date(2026, 6, 13, 9, 0)) // Monday 09:00
+		const events = [{ t: startTs, type: "start" as const }]
+		const now = new Date(2026, 6, 16, 10, 0) // Thursday
+
+		const resolved = resolveCatchup(
+			events,
+			[new Date(2026, 6, 15)], // Wednesday only
+			[0],
+			[true],
+		)
+
+		const breakdown = weeklyBreakdown(resolved, now)
+		assert.equal(breakdown[1]?.workedSec, 0) // Tuesday: blank, not bled-into
+		assert.deepEqual(
+			weeklyEntryDays(resolved, now).map((d) => d.getTime()),
+			[13, 14].map((date) => new Date(2026, 6, date).getTime()), // Mon, Tue
+		)
 	})
 })
 
