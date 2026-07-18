@@ -223,14 +223,65 @@ describe("workedSecondsInRange", () => {
 })
 
 describe("weeklyBreakdown", () => {
-	test("returns one entry per day of the week, Monday first", () => {
+	test("returns Monday..Friday only by default, weekends hidden", () => {
 		const now = new Date(2026, 6, 15, 13, 30) // Wednesday
 		const breakdown = weeklyBreakdown([], now)
 
-		assert.equal(breakdown.length, 7)
+		assert.equal(breakdown.length, 5)
 		assert.equal(breakdown[0]?.day.getDate(), 13) // Monday
-		assert.equal(breakdown[6]?.day.getDate(), 19) // Sunday
+		assert.equal(breakdown[4]?.day.getDate(), 17) // Friday
 		assert.ok(breakdown.every((entry) => entry.workedSec === 0))
+	})
+
+	test("includes Saturday once `now` is Saturday", () => {
+		const now = new Date(2026, 6, 18, 10, 0) // Saturday
+		const breakdown = weeklyBreakdown([], now)
+
+		assert.deepEqual(
+			breakdown.map((entry) => entry.day.getDate()),
+			[13, 14, 15, 16, 17, 18],
+		)
+	})
+
+	test("includes both weekend days once `now` is Sunday", () => {
+		const now = new Date(2026, 6, 19, 10, 0) // Sunday
+		const breakdown = weeklyBreakdown([], now)
+
+		assert.deepEqual(
+			breakdown.map((entry) => entry.day.getDate()),
+			[13, 14, 15, 16, 17, 18, 19],
+		)
+	})
+
+	test("prepends last weekend when last Friday was never stopped", () => {
+		const events = [
+			// Friday 2026-07-10, never stopped.
+			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
+		]
+		const now = new Date(2026, 6, 13, 9, 30) // Monday 2026-07-13
+
+		const breakdown = weeklyBreakdown(events, now)
+
+		assert.deepEqual(
+			breakdown.map((entry) => entry.day.getDate()),
+			[10, 11, 12, 13, 14, 15, 16, 17],
+		)
+		assert.equal(breakdown[0]?.workedSec, 0) // stale, pending catch-up
+	})
+
+	test("does not prepend last weekend when last Friday has a clean stop", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
+		]
+		const now = new Date(2026, 6, 13, 9, 30) // Monday 2026-07-13
+
+		const breakdown = weeklyBreakdown(events, now)
+
+		assert.deepEqual(
+			breakdown.map((entry) => entry.day.getDate()),
+			[13, 14, 15, 16, 17],
+		)
 	})
 
 	test("attributes each day's worked seconds to the right entry", () => {
@@ -331,15 +382,29 @@ describe("catchupDays", () => {
 		assert.deepEqual(catchupDays(events, new Date(2026, 6, 15, 8, 0)), [])
 	})
 
-	test("days after a clean stop, through yesterday, for a multi-day gap", () => {
+	test("a weekend gap after a clean Friday stop is skipped, only Monday remains", () => {
 		const events = [
+			// Friday 2026-07-10, stopped cleanly.
 			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
 			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
 		]
-		const days = catchupDays(events, new Date(2026, 6, 14, 8, 0))
+		const days = catchupDays(events, new Date(2026, 6, 14, 8, 0)) // Tuesday
 		assert.deepEqual(
 			days.map((d) => d.getTime()),
-			[11, 12, 13].map((date) => new Date(2026, 6, date).getTime()),
+			[new Date(2026, 6, 13).getTime()], // only Monday
+		)
+	})
+
+	test("days after a clean stop, through yesterday, for a multi-day gap that stays within the week", () => {
+		const events = [
+			// Monday 2026-07-13, stopped cleanly.
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+		]
+		const days = catchupDays(events, new Date(2026, 6, 16, 8, 0)) // Thursday
+		assert.deepEqual(
+			days.map((d) => d.getTime()),
+			[14, 15].map((date) => new Date(2026, 6, date).getTime()),
 		)
 	})
 
@@ -432,6 +497,46 @@ describe("weeklyEntryDays", () => {
 		assert.deepEqual(
 			days.map((d) => d.getTime()),
 			[13, 14, 15, 16].map((date) => new Date(2026, 6, date).getTime()),
+		)
+	})
+
+	test("a blank Saturday after a resolved Friday is not flagged pending", () => {
+		const events = [
+			// Monday through Friday worked normally.
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 14, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 15, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 16, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 16, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 17, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 17, 17, 0)), type: "stop" as const },
+		]
+		const now = new Date(2026, 6, 19, 10, 0) // Sunday, Saturday left blank
+
+		assert.deepEqual(weeklyEntryDays(events, now), [])
+	})
+
+	test("a blank Saturday after an un-stopped Friday is still flagged pending", () => {
+		const events = [
+			// Monday through Thursday worked normally.
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 14, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 15, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 16, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 16, 17, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 17, 9, 0)), type: "start" as const }, // Friday, never stopped
+		]
+		const now = new Date(2026, 6, 19, 10, 0) // Sunday
+
+		assert.deepEqual(
+			weeklyEntryDays(events, now).map((d) => d.getTime()),
+			[17, 18].map((date) => new Date(2026, 6, date).getTime()),
 		)
 	})
 })

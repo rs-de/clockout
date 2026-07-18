@@ -94,6 +94,10 @@ export const de: Record<string, TranslationEntry> = {
 		source: 'Demo: simulating "{name}" — {dateTime}. Nothing here is saved.',
 		text: 'Demo: Simulation von "{name}" — {dateTime}. Hier wird nichts gespeichert.',
 	},
+	b1956ad5: {
+		source: "Forgot to stop on Friday",
+		text: "Am Freitag zu stoppen vergessen",
+	},
 	b1f8364c: {
 		source: "Daily max",
 		text: "Tagesmaximum",

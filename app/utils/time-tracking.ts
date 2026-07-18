@@ -164,7 +164,7 @@ export function catchupDays(events: TimeEvent[], now: Date): Date[] {
 	if (lastDay.getTime() < today.getTime()) {
 		let day = last.type === "start" ? lastDay : addDays(lastDay, 1)
 		while (day.getTime() < today.getTime()) {
-			days.push(day)
+			if (weekendNeedsAttention(events, day)) days.push(day)
 			day = addDays(day, 1)
 		}
 	}
@@ -207,6 +207,7 @@ export function weeklyEntryDays(events: TimeEvent[], now: Date): Date[] {
 		day = addDays(day, 1)
 	) {
 		if (gapDaySet.has(day.getTime())) continue
+		if (!weekendNeedsAttention(events, day)) continue
 		const dayEnd = addDays(day, 1)
 		const workedSec =
 			workedSecondsInRange(events, day, dayEnd, now) -
@@ -225,6 +226,27 @@ function addDays(day: Date, count: number): Date {
 	const result = new Date(day)
 	result.setDate(result.getDate() + count)
 	return result
+}
+
+/**
+ * Whether `day` still needs its own catch-up entry / display row. Always
+ * true for a weekday. For a Saturday or Sunday, only true if that weekend's
+ * own Friday has no "stop" or "skipDay" of its own — typically nothing is
+ * worked over a weekend, so by default neither day is demanded or shown; a
+ * Friday left dangling (forgotten stop) can bleed real hours into the
+ * weekend, so that's the one case it still needs surfacing.
+ */
+function weekendNeedsAttention(events: TimeEvent[], day: Date): boolean {
+	const dow = day.getDay()
+	if (dow !== 0 && dow !== 6) return true
+
+	const friday = addDays(day, dow === 6 ? -1 : -2)
+	const fridayResolved = events.some(
+		(event) =>
+			(event.type === "stop" || event.type === "skipDay") &&
+			startOfDay(new Date(event.t * 1000)).getTime() === friday.getTime(),
+	)
+	return !fridayResolved
 }
 
 export type RelativeEvent = {
@@ -391,17 +413,42 @@ export type DailyBreakdownEntry = {
 }
 
 /**
- * Per-day worked seconds for every day of `now`'s week (Monday..Sunday),
- * so the numbers behind "Week remaining" are always visible and checkable
- * rather than a black-box total.
+ * Every day this week worth showing: Monday..Friday always, plus this
+ * week's weekend once `now` itself has reached it (Saturday shows once
+ * `now` is Saturday, Sunday once `now` is Sunday), plus any older pending
+ * catch-up day carried over from before this week (e.g. last Friday plus
+ * the weekend it bled into, if Friday was never stopped) so it stays
+ * reachable instead of falling off the display once a new week starts.
+ */
+function visibleWeekDays(events: TimeEvent[], now: Date): Date[] {
+	const weekStart = startOfWeek(now)
+	const days = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i))
+
+	const dow = now.getDay()
+	if (dow === 0 || dow === 6) days.push(addDays(weekStart, 5))
+	if (dow === 0) days.push(addDays(weekStart, 6))
+
+	const known = new Set(days.map((day) => day.getTime()))
+	for (const day of weeklyEntryDays(events, now)) {
+		if (day.getTime() < weekStart.getTime() && !known.has(day.getTime())) {
+			days.push(day)
+			known.add(day.getTime())
+		}
+	}
+
+	return days.sort((a, b) => a.getTime() - b.getTime())
+}
+
+/**
+ * Per-day worked seconds for every day `visibleWeekDays` returns, so the
+ * numbers behind "Week remaining" are always visible and checkable rather
+ * than a black-box total.
  */
 export function weeklyBreakdown(
 	events: TimeEvent[],
 	now: Date,
 ): DailyBreakdownEntry[] {
-	const weekStart = startOfWeek(now)
-	return Array.from({ length: 7 }, (_, i) => {
-		const day = addDays(weekStart, i)
+	return visibleWeekDays(events, now).map((day) => {
 		const dayEnd = addDays(day, 1)
 		const workedSec =
 			workedSecondsInRange(events, day, dayEnd, now) -

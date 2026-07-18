@@ -39,6 +39,17 @@ export const EXAMPLES: Example[] = [
 		],
 	},
 	{
+		id: "forgot-stop-friday",
+		title: "Forgot to stop on Friday",
+		description:
+			"A Friday session left open over the weekend — Friday, Saturday and Sunday all come up for catch-up on Monday.",
+		pretendWeekday: 0, // Monday
+		pretendTime: "08:30",
+		events: [
+			{ daysAgo: 3, time: "09:00", type: "start" }, // Friday last week, never stopped
+		],
+	},
+	{
 		id: "lunch-break",
 		title: "Lunch break",
 		description:
