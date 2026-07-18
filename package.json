@@ -6,10 +6,12 @@
 		"dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
 		"start": "NODE_ENV=production node --import remix/node-tsx server.ts",
 		"test": "NODE_ENV=test node --import remix/node-tsx --test",
+		"i18n:sync": "node --import remix/node-tsx scripts/i18n-sync.ts",
+		"i18n:check": "node --import remix/node-tsx scripts/i18n-sync.ts --check",
 		"typecheck": "tsc --noEmit",
 		"format": "biome format --write .",
 		"lint": "biome lint --write .",
-		"check": "biome check --write ."
+		"check": "biome check --write . && pnpm i18n:check"
 	},
 	"engines": {
 		"node": ">=24"

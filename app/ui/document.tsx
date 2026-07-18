@@ -1,21 +1,29 @@
 import type { Handle, RemixNode } from "remix/ui"
 
 import { routes } from "../routes.ts"
+import { createTranslator, DEFAULT_LANG, type Lang } from "../utils/i18n.ts"
 
 export interface DocumentProps {
 	children?: RemixNode
 	head?: RemixNode
 	title?: string
+	lang?: Lang
 }
 
 const DEFAULT_TITLE = readAppDisplayName("Clockout")
 
 export function Document(handle: Handle<DocumentProps>) {
 	return () => {
-		const { children, head, title = DEFAULT_TITLE } = handle.props
+		const {
+			children,
+			head,
+			title = DEFAULT_TITLE,
+			lang = DEFAULT_LANG,
+		} = handle.props
+		const t = createTranslator(lang)
 
 		return (
-			<html lang="en">
+			<html lang={lang}>
 				<head>
 					<meta charSet="utf-8" />
 					<meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -30,7 +38,7 @@ export function Document(handle: Handle<DocumentProps>) {
 				<body>
 					{children}
 					<footer>
-						<a href="/about">About clockout</a>
+						<a href="/about">{t("About clockout")}</a>
 					</footer>
 					<script
 						type="module"

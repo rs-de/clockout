@@ -5,6 +5,7 @@ import { routes } from "../routes.ts"
 import { AboutPage } from "../ui/about.tsx"
 import { App } from "../ui/app.tsx"
 import { Document } from "../ui/document.tsx"
+import { resolveLang } from "../utils/i18n.ts"
 
 export default createController(routes, {
 	actions: {
@@ -15,30 +16,34 @@ export default createController(routes, {
 			)
 		},
 		home(context) {
+			const lang = resolveLang(context.request.headers.get("accept-language"))
 			return context.render(
-				<Document>
-					<App />
+				<Document lang={lang}>
+					<App lang={lang} />
 				</Document>,
 			)
 		},
 		doc(context) {
+			const lang = resolveLang(context.request.headers.get("accept-language"))
 			return context.render(
-				<Document>
-					<App />
+				<Document lang={lang}>
+					<App lang={lang} />
 				</Document>,
 			)
 		},
 		example(context) {
+			const lang = resolveLang(context.request.headers.get("accept-language"))
 			return context.render(
-				<Document>
-					<App />
+				<Document lang={lang}>
+					<App lang={lang} />
 				</Document>,
 			)
 		},
 		about(context) {
+			const lang = resolveLang(context.request.headers.get("accept-language"))
 			return context.render(
-				<Document title="About — clockout">
-					<AboutPage />
+				<Document title="About — clockout" lang={lang}>
+					<AboutPage lang={lang} />
 				</Document>,
 			)
 		},

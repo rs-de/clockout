@@ -104,3 +104,9 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 33. Add configurable dateFormat (de/iso/auto) to setup form, default "de"
     `(add date-format.ts; dateFormat in TrackingSettings; setup <select>)`
+
+34. Add i18n: hash-keyed t(), dev-time sync script, Accept-Language detect
+    `(add i18n.ts/de.ts/i18n-sync.ts; t() in app.tsx/document.tsx/about.tsx)`
+
+35. Add pnpm check gate: fail if any t() string isn't synced/translated
+    `(add --check to i18n-sync.ts; wire into package.json's check script)`
