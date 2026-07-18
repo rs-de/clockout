@@ -66,7 +66,7 @@ export const EXAMPLES: Example[] = [
 			{ daysAgo: 2, time: "17:00", type: "stop" },
 			{ daysAgo: 1, time: "09:00", type: "start" },
 			{ daysAgo: 1, time: "17:00", type: "stop" },
-			{ daysAgo: 0, time: "09:00", type: "start" },
+			{ daysAgo: 0, time: "13:00", type: "start" },
 		],
 	},
 ]
