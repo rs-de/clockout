@@ -172,12 +172,11 @@ export function weeklyEntryDays(events: TimeEvent[], now: Date): Date[] {
 		if (gapDaySet.has(day.getTime())) continue
 		const dayEnd = addDays(day, 1)
 		const workedSec = workedSecondsInRange(events, day, dayEnd, now)
-		const hasSkipMarker = events.some(
+		const hasOwnDayEvent = events.some(
 			(event) =>
-				event.type === "skipDay" &&
 				startOfDay(new Date(event.t * 1000)).getTime() === day.getTime(),
 		)
-		if (workedSec === 0 && !hasSkipMarker) blankDays.push(day)
+		if (workedSec === 0 && !hasOwnDayEvent) blankDays.push(day)
 	}
 
 	return [...gapDays, ...blankDays].sort((a, b) => a.getTime() - b.getTime())
