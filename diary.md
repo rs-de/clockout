@@ -131,3 +131,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 42. Add "Forgot to stop on Friday" example, demoing the weekend catch-up
     `(add example to examples.ts; translate title in de.ts via i18n:sync)`
+
+43. Pre-check "Did not work" on catch-up weekend days (Friday stays open)
+    `(edit app.tsx: defaultChecked/disabled by day.getDay() in weekList)`

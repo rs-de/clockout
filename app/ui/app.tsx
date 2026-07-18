@@ -476,6 +476,12 @@ function renderTrackingScreen(
 				)
 			}
 
+			// A weekend day only ever reaches this pending-entry branch because
+			// its own Friday wasn't stopped, not because the weekend itself is
+			// likely worked — so pre-check "Did not work" for it (Friday stays
+			// unchecked, since that's the day that actually needs real hours).
+			const isWeekend = day.getDay() === 0 || day.getDay() === 6
+
 			return (
 				<li key={day.getTime()}>
 					<fieldset>
@@ -486,6 +492,7 @@ function renderTrackingScreen(
 							min="0"
 							max="23"
 							defaultValue="0"
+							disabled={isWeekend}
 						/>{" "}
 						{t("h")}
 						<input
@@ -494,12 +501,14 @@ function renderTrackingScreen(
 							min="0"
 							max="59"
 							defaultValue="0"
+							disabled={isWeekend}
 						/>{" "}
 						{t("m")}
 						<label>
 							<input
 								name={`day-${i}-skip`}
 								type="checkbox"
+								defaultChecked={isWeekend}
 								mix={on("change", (event) => {
 									toggleCatchupDayFields(
 										event.currentTarget.closest("fieldset"),
