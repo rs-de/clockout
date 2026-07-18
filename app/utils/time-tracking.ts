@@ -217,30 +217,36 @@ export function resolveRelativeEvents(
 
 /**
  * Backfills the days from requirement #9. `days` must be
- * `weeklyEntryDays(events, now)` (or `catchupDays`) and `workedMinutesPerDay`
- * aligned to it, in chronological order. If the last event is a still-open
- * start, whichever entry in `days` matches *that start's own calendar day*
- * keeps its exact timestamp and only gets its missing stop added (at start +
- * duration) — even if 0 minutes, since that dangling start must be closed
- * somehow regardless. Matching by date rather than always assuming index 0
- * means an earlier, otherwise-untouched day (e.g. a Monday before the very
- * first thing ever tracked) can safely appear before it in `days`. Every
- * other day with minutes > 0 gets a fresh start/stop pair, anchored at local
- * midnight *or* right after the previous day's session ends, whichever is
- * later — so a day entered with enough hours to run past midnight (e.g. a
- * forgotten start at 08:00 plus 20h) still credits its full duration instead
- * of getting clamped, and the next day's session is chained after it instead
- * of overlapping it (see the regression test: a naive midnight anchor would
+ * `weeklyEntryDays(events, now)` (or `catchupDays`), with
+ * `workedMinutesPerDay` and `skipDayFlags` aligned to it, in chronological
+ * order. If the last event is a still-open start, whichever entry in `days`
+ * matches *that start's own calendar day* keeps its exact timestamp and only
+ * gets its missing stop added (at start + duration) — even if 0 minutes,
+ * since that dangling start must be closed somehow regardless. Matching by
+ * date rather than always assuming index 0 means an earlier,
+ * otherwise-untouched day (e.g. a Monday before the very first thing ever
+ * tracked) can safely appear before it in `days`. Every other day with
+ * minutes > 0 gets a fresh start/stop pair, anchored at local midnight *or*
+ * right after the previous day's session ends, whichever is later — so a day
+ * entered with enough hours to run past midnight (e.g. a forgotten start at
+ * 08:00 plus 20h) still credits its full duration instead of getting
+ * clamped, and the next day's session is chained after it instead of
+ * overlapping it (see the regression test: a naive midnight anchor would
  * make the two sessions interleave, which breaks workedSecondsInRange's
  * single-open-start assumption and silently discards most of both days'
- * hours). Every other day entered as 0 gets an explicit "skipDay" marker
- * instead, so "no work today" is recorded unambiguously and a fresh
- * `weeklyEntryDays` call afterwards never re-opens it.
+ * hours). Every other day with 0 minutes and its `skipDayFlags` entry set
+ * gets an explicit "skipDay" marker instead, so "no work today" is recorded
+ * unambiguously and a fresh `weeklyEntryDays` call afterwards never re-opens
+ * it. A day left at 0 minutes *without* its skip flag set is left
+ * completely untouched — the user never answered for it, so it stays
+ * pending rather than being silently recorded as "no work" just because it
+ * shares a form with days that were answered.
  */
 export function resolveCatchup(
 	events: TimeEvent[],
 	days: Date[],
 	workedMinutesPerDay: number[],
+	skipDayFlags: boolean[],
 ): TimeEvent[] {
 	if (days.length === 0) return events
 	const last = lastEvent(events)
@@ -269,7 +275,7 @@ export function resolveCatchup(
 			result.push({ t: startSec, type: "start" })
 			result.push({ t: stopSec, type: "stop" })
 			cursorSec = stopSec
-		} else {
+		} else if (skipDayFlags[i]) {
 			result.push({ t: dayStartSec, type: "skipDay" })
 		}
 	})

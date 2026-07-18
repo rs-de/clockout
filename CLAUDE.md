@@ -31,7 +31,9 @@ Prefer `git restore <file>` over the Edit tool when reverting a tracked file to 
 pnpm install        # install dependencies
 pnpm dev            # start dev server
 pnpm start          # production server
-pnpm test           # run tests (Node built-in runner)
+pnpm test           # run all tests (unit + e2e)
+pnpm test:unit      # unit tests (Node built-in runner)
+pnpm test:e2e       # Playwright e2e suite (tests/e2e.spec.ts)
 pnpm typecheck      # tsc --noEmit
 pnpm check          # Biome lint + format (auto-fix)
 ```

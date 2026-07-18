@@ -7,10 +7,32 @@ description: Build/launch/drive recipe for verifying clockout end-to-end in a re
 
 This is a browser app (client-side crypto + IndexedDB, no meaningful
 server state yet). Verifying it means driving it in a real browser, not
-just `pnpm test`/`pnpm typecheck` — both stayed green through two crashes
-that only showed up when the server actually ran.
+just `pnpm test:unit`/`pnpm typecheck` — both stayed green through two
+crashes that only showed up when the server actually ran.
 
-## Launch
+## Playwright is a permanent devDependency
+
+Per the global `webapp-paradigms` skill's e2e standard: `playwright` and
+`@playwright/test` are real, permanent devDependencies here — not a
+tool installed and removed per verification pass.
+
+```sh
+pnpm test:e2e          # playwright test — runs tests/e2e.spec.ts
+pnpm test              # test:unit && test:e2e
+```
+
+`playwright.config.ts` auto-starts the app itself (`webServer` block on
+`http://localhost:44100`, reusing an already-running `pnpm dev` locally),
+so no manual server launch is needed before running these.
+
+**When a feature changes browser-visible behavior, extend
+`tests/e2e.spec.ts`** — don't add a new spec file per feature; grow the one
+suite.
+
+## Manual one-off driving (exploratory only)
+
+For a quick manual look (not a permanent test), launch the dev server
+directly:
 
 ```sh
 PORT=44177 pnpm dev > /tmp/clockout-dev.log 2>&1 &
@@ -23,34 +45,16 @@ tail -f /tmp/clockout-dev.log                                       # watch for 
 server after editing any browser-served file (`app/ui/**`, `app/utils/**`,
 `app/assets/**`).
 
-## Drive it
-
-No Playwright installed in the project (adding it is a real dependency
-decision — ask first, like fake-indexeddb). For one-off verification:
-
-```sh
-pnpm add -D playwright@1.61.1   # temporary
-# write a .mjs script INSIDE the project dir (node_modules resolution
-# needs the script's own path to be under the project tree — a script in
-# /tmp or the scratchpad can't resolve `import "playwright"` even with cwd set)
-node /Users/jpr/dev/rushsoft/clockout/.tmp-verify.mjs
-rm /Users/jpr/dev/rushsoft/clockout/.tmp-verify.mjs
-pnpm remove playwright
-git restore pnpm-lock.yaml   # `pnpm remove` can leave transitive drift
-                              # (e.g. remix's optional peer dep on playwright)
-                              # in the lockfile; restore + `pnpm install
-                              # --frozen-lockfile` to get back to clean
-pnpm install --frozen-lockfile
-```
-
-Chromium is already cached at `~/Library/Caches/ms-playwright` on this
-machine, so `chromium.launch()` works without a separate browser install
-step.
+Since Playwright is already a project dependency, write a throwaway
+`.mjs` driver script directly against `chromium.launch()` (see
+`tests/e2e.spec.ts` for the app flow/selectors to reuse) and delete it
+when done — no need to install/remove the package anymore.
 
 ## Flow to drive
 
 1. Load `/` → setup form (weekly/daily target fields, password + repeat,
-   "Speichern und los ..." button, disabled until passwords match).
+   "Save and start tracking" button — English by default; German only
+   when the request's `Accept-Language` resolves to `de`).
 2. Submit → creates a `TrackingData` doc, saves to IndexedDB, switches to
    the tracking screen (day/week remaining time, Start/Stop toggle).
 3. Click Start/Stop → toggles, persists the event, remaining time ticks

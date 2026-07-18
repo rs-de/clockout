@@ -442,7 +442,7 @@ describe("resolveCatchup", () => {
 			{ t: 0, type: "start" as const },
 			{ t: 1 * H, type: "stop" as const },
 		]
-		assert.deepEqual(resolveCatchup(events, [], []), events)
+		assert.deepEqual(resolveCatchup(events, [], [], []), events)
 	})
 
 	test("adds only a stop for the open start's own day, preserving its timestamp", () => {
@@ -450,13 +450,13 @@ describe("resolveCatchup", () => {
 		const events = [{ t: startTs, type: "start" as const }]
 		const days = [new Date(2026, 6, 14)]
 
-		assert.deepEqual(resolveCatchup(events, days, [90]), [
+		assert.deepEqual(resolveCatchup(events, days, [90], [false]), [
 			{ t: startTs, type: "start" },
 			{ t: startTs + 90 * 60, type: "stop" },
 		])
 	})
 
-	test("adds a fresh start/stop pair for worked days and a skipDay marker for every 0-entry day", () => {
+	test("adds a fresh start/stop pair for worked days, a skipDay marker for explicitly-skipped days, and leaves untouched 0-entry days alone", () => {
 		const startTs = toSec(new Date(2026, 6, 10, 9, 0))
 		const events = [{ t: startTs, type: "start" as const }]
 		const days = [
@@ -466,24 +466,26 @@ describe("resolveCatchup", () => {
 			new Date(2026, 6, 13),
 		]
 		const day11Start = toSec(new Date(2026, 6, 11))
-		const day12Start = toSec(new Date(2026, 6, 12))
 		const day13Start = toSec(new Date(2026, 6, 13))
 
 		// day 10 (open start, 0min): marker stop only, closing the real
-		// dangling start. day 11 (120min): full pair. day 12 (0min, not
-		// last): skipDay. day 13 (0min, last): also skipDay - every 0-entry
-		// day is marked the same way now, not just the last.
-		assert.deepEqual(resolveCatchup(events, days, [0, 120, 0, 0]), [
-			{ t: startTs, type: "start" },
-			{ t: startTs, type: "stop" },
-			{ t: day11Start, type: "start" },
-			{ t: day11Start + 120 * 60, type: "stop" },
-			{ t: day12Start, type: "skipDay" },
-			{ t: day13Start, type: "skipDay" },
-		])
+		// dangling start, regardless of any skip flag. day 11 (120min): full
+		// pair. day 12 (0min, not skipped): the user never answered for it,
+		// so nothing is pushed - it stays pending. day 13 (0min, explicitly
+		// skipped): skipDay marker.
+		assert.deepEqual(
+			resolveCatchup(events, days, [0, 120, 0, 0], [false, false, false, true]),
+			[
+				{ t: startTs, type: "start" },
+				{ t: startTs, type: "stop" },
+				{ t: day11Start, type: "start" },
+				{ t: day11Start + 120 * 60, type: "stop" },
+				{ t: day13Start, type: "skipDay" },
+			],
+		)
 	})
 
-	test("adds a fresh pair for worked days and a skipDay marker for a 0-entry day after a clean stop", () => {
+	test("adds a fresh pair for worked days and a skipDay marker for an explicitly-skipped 0-entry day after a clean stop", () => {
 		const events = [
 			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
 			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
@@ -492,12 +494,22 @@ describe("resolveCatchup", () => {
 		const day11Start = toSec(new Date(2026, 6, 11))
 		const day12Start = toSec(new Date(2026, 6, 12))
 
-		assert.deepEqual(resolveCatchup(events, days, [240, 0]), [
+		assert.deepEqual(resolveCatchup(events, days, [240, 0], [false, true]), [
 			...events,
 			{ t: day11Start, type: "start" },
 			{ t: day11Start + 240 * 60, type: "stop" },
 			{ t: day12Start, type: "skipDay" },
 		])
+	})
+
+	test("a 0-entry day left unanswered (not explicitly skipped) is untouched and stays due for entry", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
+		]
+		const days = [new Date(2026, 6, 11)]
+
+		assert.deepEqual(resolveCatchup(events, days, [0], [false]), events)
 	})
 
 	test("a skipDay marker never disrupts an overlapping real session", () => {
@@ -509,7 +521,7 @@ describe("resolveCatchup", () => {
 		const events = [{ t: startTs, type: "start" as const }]
 		const days = [new Date(2026, 6, 13), new Date(2026, 6, 14)]
 
-		const resolved = resolveCatchup(events, days, [20 * 60, 0])
+		const resolved = resolveCatchup(events, days, [20 * 60, 0], [false, true])
 
 		assert.deepEqual(resolved, [
 			{ t: startTs, type: "start" },
@@ -530,7 +542,7 @@ describe("resolveCatchup", () => {
 		assert.equal(summary.weeklyWorkedSec, 20 * H)
 	})
 
-	test("regression: a 0-entry on the last day doesn't reopen the same day next render", () => {
+	test("regression: an explicitly-skipped last day doesn't reopen the same day next render", () => {
 		const events = [
 			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
 			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
@@ -542,6 +554,7 @@ describe("resolveCatchup", () => {
 			events,
 			days,
 			days.map(() => 0),
+			days.map(() => true),
 		)
 
 		assert.deepEqual(catchupDays(resolved, now), [])
@@ -566,7 +579,12 @@ describe("resolveCatchup", () => {
 			new Date(2026, 6, 15),
 		]
 
-		const resolved = resolveCatchup(events, days, [20 * 60, 20 * 60, 20 * 60])
+		const resolved = resolveCatchup(
+			events,
+			days,
+			[20 * 60, 20 * 60, 20 * 60],
+			[false, false, false],
+		)
 
 		// Three fully back-to-back 20h sessions: Mon 08:00 -> Tue 04:00 ->
 		// Wed 00:00 -> Wed 20:00, each chained exactly where the last ended.

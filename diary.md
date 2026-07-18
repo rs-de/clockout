@@ -116,3 +116,9 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 37. Use a fixed-width font for the read-only weekly data rows
     `(add .data-row class in app.css; apply in app.tsx breakdown list)`
+
+38. Fix catch-up days reappearing/auto-resolving; only answered days save
+    `(edit time-tracking.ts: weeklyEntryDays event check; skip flags; app.tsx)`
+
+39. Add a permanent Playwright e2e suite (adopts the new global standard)
+    `(pnpm add -D playwright @playwright/test; config + tests/e2e.spec.ts)`

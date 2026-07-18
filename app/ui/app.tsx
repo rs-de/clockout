@@ -70,9 +70,13 @@ function readMinutes(
 	return hours * 60 + minutes
 }
 
+function readCatchupSkip(formData: FormData, i: number): boolean {
+	return formData.get(`day-${i}-skip`) === "on"
+}
+
 /** The "did not work" checkbox always wins over whatever's left in the hour/minute fields. */
 function readCatchupMinutes(formData: FormData, i: number): number {
-	if (formData.get(`day-${i}-skip`) === "on") return 0
+	if (readCatchupSkip(formData, i)) return 0
 	return readMinutes(formData, `day-${i}-hours`, `day-${i}-minutes`)
 }
 
@@ -237,7 +241,13 @@ export const App = clientEntry(
 			const workedMinutesPerDay = days.map((_, i) =>
 				readCatchupMinutes(formData, i),
 			)
-			data.events = resolveCatchup(data.events, days, workedMinutesPerDay)
+			const skipDayFlags = days.map((_, i) => readCatchupSkip(formData, i))
+			data.events = resolveCatchup(
+				data.events,
+				days,
+				workedMinutesPerDay,
+				skipDayFlags,
+			)
 			await saveTrackingData(data)
 			handle.update()
 			if (sessionPassword) void syncToServer(data, sessionPassword)
@@ -269,7 +279,13 @@ export const App = clientEntry(
 			const workedMinutesPerDay = days.map((_, i) =>
 				readCatchupMinutes(formData, i),
 			)
-			data.events = resolveCatchup(data.events, days, workedMinutesPerDay)
+			const skipDayFlags = days.map((_, i) => readCatchupSkip(formData, i))
+			data.events = resolveCatchup(
+				data.events,
+				days,
+				workedMinutesPerDay,
+				skipDayFlags,
+			)
 			handle.update()
 		}
 
