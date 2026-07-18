@@ -110,3 +110,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 35. Add pnpm check gate: fail if any t() string isn't synced/translated
     `(add --check to i18n-sync.ts; wire into package.json's check script)`
+
+36. Translate example titles (About page links, demo banner)
+    `(t(example.title) in about.tsx/app.tsx; extract EXAMPLES in sync script)`

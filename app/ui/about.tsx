@@ -17,7 +17,7 @@ export function AboutPage(handle: Handle<AboutPageProps>) {
 				<ul>
 					{EXAMPLES.map((example) => (
 						<li key={example.id}>
-							<a href={`/example/${example.id}`}>{example.title}</a>
+							<a href={`/example/${example.id}`}>{t(example.title)}</a>
 						</li>
 					))}
 				</ul>

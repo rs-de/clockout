@@ -42,6 +42,10 @@ export const de: Record<string, TranslationEntry> = {
 		source: "Date format",
 		text: "Datumsformat",
 	},
+	"5baf9a32": {
+		source: "A steady week",
+		text: "Eine ruhige Woche",
+	},
 	"60580087": {
 		source: "Save hours",
 		text: "Stunden speichern",
@@ -115,6 +119,10 @@ export const de: Record<string, TranslationEntry> = {
 		source: "Repeat password",
 		text: "Passwort wiederholen",
 	},
+	e9ad2040: {
+		source: "Lunch break",
+		text: "Mittagspause",
+	},
 	ea1c42ce: {
 		source: "Sync failed (offline?)",
 		text: "Synchronisierung fehlgeschlagen (offline?)",
@@ -122,5 +130,9 @@ export const de: Record<string, TranslationEntry> = {
 	ed0c3757: {
 		source: "h",
 		text: "h",
+	},
+	f605d16d: {
+		source: "Forgot to stop",
+		text: "Zu stoppen vergessen",
 	},
 }

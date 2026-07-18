@@ -424,7 +424,7 @@ export const App = clientEntry(
 				t,
 				<p role="status">
 					{t('Demo: simulating "{name}" — {dateTime}. Nothing here is saved.', {
-						name: example.title,
+						name: t(example.title),
 						dateTime,
 					})}{" "}
 					<a href="/about">{t("Back to examples")}</a>

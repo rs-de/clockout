@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { EXAMPLES } from "../app/utils/examples.ts"
 import { CONFIGURED_LANGUAGES, hashKey } from "../app/utils/i18n.ts"
 
 const APP_DIR = new URL("../app/", import.meta.url).pathname
@@ -51,6 +52,14 @@ async function main() {
 		for (const literal of extractLiterals(readFileSync(file, "utf8"), file)) {
 			sources.set(hashKey(literal), literal)
 		}
+	}
+
+	// EXAMPLES' titles are rendered via `t(example.title)` — a dynamic call
+	// site, since the value comes from data, not a literal — so the generic
+	// t(...) scan above can't find them. They're still translatable text, so
+	// pull them in directly from their one source of truth.
+	for (const example of EXAMPLES) {
+		sources.set(hashKey(example.title), example.title)
 	}
 
 	for (const lang of CONFIGURED_LANGUAGES) {
