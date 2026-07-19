@@ -86,7 +86,13 @@ async function syncLanguageFile(
 		}
 	}
 
+	// A key whose source text no longer appears anywhere in the app is dead
+	// weight — it can only get here if the `t()` call (or EXAMPLES title) that
+	// introduced it was since deleted or reworded.
+	const staleKeys = Object.keys(entries).filter((key) => !sources.has(key))
+
 	if (CHECK_ONLY) {
+		let ok = true
 		if (missingKeys.length > 0) {
 			console.error(
 				`${lang}: ${missingKeys.length} string(s) not yet synced — run \`pnpm i18n:sync\` and translate them:`,
@@ -94,6 +100,18 @@ async function syncLanguageFile(
 			for (const key of missingKeys) {
 				console.error(`  ${JSON.stringify(key)}`)
 			}
+			ok = false
+		}
+		if (staleKeys.length > 0) {
+			console.error(
+				`${lang}: ${staleKeys.length} key(s) no longer used in source — run \`pnpm i18n:sync\` to remove them:`,
+			)
+			for (const key of staleKeys) {
+				console.error(`  ${JSON.stringify(key)}`)
+			}
+			ok = false
+		}
+		if (!ok) {
 			process.exitCode = 1
 		} else {
 			const untranslated = Object.entries(entries).filter(
@@ -112,6 +130,8 @@ async function syncLanguageFile(
 		return
 	}
 
+	for (const key of staleKeys) delete entries[key]
+
 	const sortedKeys = Object.keys(entries).sort()
 	const body = sortedKeys
 		.map((key) => `\t${JSON.stringify(key)}: ${JSON.stringify(entries[key])},`)
@@ -123,13 +143,21 @@ async function syncLanguageFile(
 			`export const ${lang}: Record<string, string> = {\n${body}\n}\n`,
 	)
 
-	if (missingKeys.length === 0) {
+	if (missingKeys.length === 0 && staleKeys.length === 0) {
 		console.log(`${lang}: up to date (${sortedKeys.length} keys).`)
-	} else {
+		return
+	}
+	if (missingKeys.length > 0) {
 		console.log(
 			`${lang}: added ${missingKeys.length} new key(s), needs translating:`,
 		)
 		for (const key of missingKeys) {
+			console.log(`  ${JSON.stringify(key)}`)
+		}
+	}
+	if (staleKeys.length > 0) {
+		console.log(`${lang}: removed ${staleKeys.length} unused key(s):`)
+		for (const key of staleKeys) {
 			console.log(`  ${JSON.stringify(key)}`)
 		}
 	}
