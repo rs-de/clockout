@@ -565,14 +565,24 @@ function renderTrackingScreen(
 			) : (
 				<ul>{weekList}</ul>
 			)}
-			<button
-				type="button"
-				className="toggle-button"
-				mix={on("click", onToggle)}
-				data-running={summary.isRunning}
-			>
-				{summary.isRunning ? t("Stop") : t("Start")}
-			</button>
+			{
+				// A dangling start from an earlier day (not today) has nothing
+				// live to "stop" — closing it here would just slap a "stop" on
+				// it at whatever moment this button happens to get clicked,
+				// silently collapsing the whole unresolved gap (including any
+				// still-dangling weekend) into one bogus multi-day session.
+				// Only the catch-up form above can close it correctly, per day.
+				!(summary.isRunning && summary.startedAt === null) && (
+					<button
+						type="button"
+						className="toggle-button"
+						mix={on("click", onToggle)}
+						data-running={summary.isRunning}
+					>
+						{summary.isRunning ? t("Stop") : t("Start")}
+					</button>
+				)
+			}
 			{footer}
 		</div>
 	)

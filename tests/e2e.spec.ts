@@ -29,3 +29,21 @@ test("setup creates tracking data, toggling persists across reload", async ({
 	await page.getByRole("button", { name: "Stop" }).click()
 	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
 })
+
+test("a stale dangling start hides the toggle until catch-up is resolved", async ({
+	page,
+}) => {
+	await page.goto("/example/forgot-stop-friday")
+
+	// Friday's session was left open days ago — nothing live to "Stop", so
+	// the toggle must stay hidden rather than let a click silently close
+	// that whole gap out as one bogus multi-day session.
+	await expect(page.getByRole("button", { name: "Stop" })).toHaveCount(0)
+	await expect(page.getByRole("button", { name: "Start" })).toHaveCount(0)
+
+	const fieldsets = page.locator("fieldset")
+	await fieldsets.nth(0).getByRole("spinbutton").first().fill("8")
+	await page.getByRole("button", { name: "Save hours" }).click()
+
+	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
+})
