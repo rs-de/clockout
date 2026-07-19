@@ -9,28 +9,8 @@ export const DEFAULT_LANG: Lang = "en"
 /** Languages with a generated translation file under app/i18n/. */
 export const CONFIGURED_LANGUAGES: Lang[] = ["de"]
 
-export type TranslationEntry = {
-	/** The original English template, kept so app/i18n/*.ts stays human-readable — the key itself is an opaque hash. */
-	source: string
-	text: string
-}
-
-const TRANSLATIONS: Partial<Record<Lang, Record<string, TranslationEntry>>> = {
+const TRANSLATIONS: Partial<Record<Lang, Record<string, string>>> = {
 	de,
-}
-
-/**
- * 32-bit FNV-1a, hex-encoded. Deterministic and dependency-free so it runs
- * identically in the Node sync script and in the browser (no Web Crypto
- * async API needed for a plain-sync `t()` call).
- */
-export function hashKey(text: string): string {
-	let hash = 0x811c9dc5
-	for (let i = 0; i < text.length; i++) {
-		hash ^= text.charCodeAt(i)
-		hash = Math.imul(hash, 0x01000193)
-	}
-	return (hash >>> 0).toString(16).padStart(8, "0")
 }
 
 /** Parses an `Accept-Language` header and picks the best-quality supported language, defaulting to `en`. */
@@ -68,9 +48,7 @@ export function createTranslator(lang: Lang): Translator {
 		params?: Record<string, string | number>,
 	): string {
 		const text =
-			lang === DEFAULT_LANG
-				? template
-				: (table?.[hashKey(template)]?.text ?? template)
+			lang === DEFAULT_LANG ? template : (table?.[template] ?? template)
 		return interpolate(text, params)
 	}
 }

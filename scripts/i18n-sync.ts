@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { EXAMPLES } from "../app/utils/examples.ts"
-import { CONFIGURED_LANGUAGES, hashKey } from "../app/utils/i18n.ts"
+import { CONFIGURED_LANGUAGES } from "../app/utils/i18n.ts"
 
 const APP_DIR = new URL("../app/", import.meta.url).pathname
 const I18N_DIR = join(APP_DIR, "i18n")
@@ -47,10 +47,10 @@ function extractLiterals(source: string, file: string): string[] {
 
 async function main() {
 	const files = listSourceFiles(APP_DIR)
-	const sources = new Map<string, string>() // hash key -> source text
+	const sources = new Set<string>()
 	for (const file of files) {
 		for (const literal of extractLiterals(readFileSync(file, "utf8"), file)) {
-			sources.set(hashKey(literal), literal)
+			sources.add(literal)
 		}
 	}
 
@@ -59,7 +59,7 @@ async function main() {
 	// t(...) scan above can't find them. They're still translatable text, so
 	// pull them in directly from their one source of truth.
 	for (const example of EXAMPLES) {
-		sources.set(hashKey(example.title), example.title)
+		sources.add(example.title)
 	}
 
 	for (const lang of CONFIGURED_LANGUAGES) {
@@ -71,18 +71,18 @@ async function main() {
 async function syncLanguageFile(
 	lang: string,
 	modulePath: string,
-	sources: Map<string, string>,
+	sources: Set<string>,
 ) {
 	const existing = (await import(modulePath)) as {
-		[key: string]: Record<string, { source: string; text: string }>
+		[key: string]: Record<string, string>
 	}
 	const entries = { ...existing[lang] }
 
 	const missingKeys: string[] = []
-	for (const [key, source] of sources) {
-		if (!entries[key]) {
-			missingKeys.push(key)
-			if (!CHECK_ONLY) entries[key] = { source, text: source }
+	for (const source of sources) {
+		if (!(source in entries)) {
+			missingKeys.push(source)
+			if (!CHECK_ONLY) entries[source] = source
 		}
 	}
 
@@ -92,19 +92,19 @@ async function syncLanguageFile(
 				`${lang}: ${missingKeys.length} string(s) not yet synced — run \`pnpm i18n:sync\` and translate them:`,
 			)
 			for (const key of missingKeys) {
-				console.error(`  ${key}: ${JSON.stringify(sources.get(key))}`)
+				console.error(`  ${JSON.stringify(key)}`)
 			}
 			process.exitCode = 1
 		} else {
 			const untranslated = Object.entries(entries).filter(
-				([, entry]) => entry.text === entry.source,
+				([key, text]) => text === key,
 			)
 			if (untranslated.length > 0) {
 				console.warn(
 					`${lang}: ${untranslated.length} key(s) still match their English source — double-check these are actually translated:`,
 				)
-				for (const [key, entry] of untranslated) {
-					console.warn(`  ${key}: ${JSON.stringify(entry.source)}`)
+				for (const [key] of untranslated) {
+					console.warn(`  ${JSON.stringify(key)}`)
 				}
 			}
 			console.log(`${lang}: all ${Object.keys(entries).length} keys synced.`)
@@ -114,17 +114,13 @@ async function syncLanguageFile(
 
 	const sortedKeys = Object.keys(entries).sort()
 	const body = sortedKeys
-		.map((key) => {
-			const { source, text } = entries[key] as { source: string; text: string }
-			return `\t${JSON.stringify(key)}: ${JSON.stringify({ source, text }, null, "\t").replace(/\n/g, "\n\t")},`
-		})
+		.map((key) => `\t${JSON.stringify(key)}: ${JSON.stringify(entries[key])},`)
 		.join("\n")
 
 	writeFileSync(
 		modulePath,
-		`import type { TranslationEntry } from "../utils/i18n.ts"\n\n` +
-			`// Generated/maintained by \`pnpm i18n:sync\` — do not hand-edit keys, only \`text\`.\n` +
-			`export const ${lang}: Record<string, TranslationEntry> = {\n${body}\n}\n`,
+		`// Generated/maintained by \`pnpm i18n:sync\` — do not hand-edit keys, only values.\n` +
+			`export const ${lang}: Record<string, string> = {\n${body}\n}\n`,
 	)
 
 	if (missingKeys.length === 0) {
@@ -134,7 +130,7 @@ async function syncLanguageFile(
 			`${lang}: added ${missingKeys.length} new key(s), needs translating:`,
 		)
 		for (const key of missingKeys) {
-			console.log(`  ${key}: ${JSON.stringify(entries[key]?.source)}`)
+			console.log(`  ${JSON.stringify(key)}`)
 		}
 	}
 }

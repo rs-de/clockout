@@ -134,3 +134,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 43. Pre-check "Did not work" on catch-up weekend days (Friday stays open)
     `(edit app.tsx: defaultChecked/disabled by day.getDay() in weekList)`
+
+44. i18n: key translations by source text directly, drop the FNV-1a hash
+    `(edit i18n.ts/i18n-sync.ts/de.ts; update global webapp-paradigms i18n.md)`
