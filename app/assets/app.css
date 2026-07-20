@@ -286,6 +286,15 @@ small {
 	margin-top: 0;
 }
 
+/* A fieldset's own padding-bottom is an unreliable place to own the gap to
+   its border — fieldset's box model (because of <legend>'s special
+   out-of-flow handling) is one of the least consistently implemented parts
+   of CSS across engines. Zero it here and let .field-hint's own margin-
+   bottom (an ordinary block element's margin) own that space instead. */
+fieldset > .field-hint {
+	margin-bottom: 1rem;
+}
+
 .field-error {
 	margin: 0;
 	color: var(--color-stop);
@@ -295,7 +304,7 @@ small {
 fieldset {
 	border: 1px solid hsl(var(--slate-6));
 	border-radius: 0.5rem;
-	padding: 0.75rem 1rem 1rem;
+	padding: 0.75rem 1rem 0;
 }
 
 legend {
