@@ -329,8 +329,7 @@ export const App = clientEntry(
 							name="username"
 							type="text"
 							autoComplete="username"
-							value={id}
-							readOnly
+							defaultValue={id}
 							tabIndex={-1}
 							aria-hidden="true"
 						/>
@@ -383,8 +382,7 @@ export const App = clientEntry(
 							name="username"
 							type="text"
 							autoComplete="username"
-							value={id}
-							readOnly
+							defaultValue={id}
 							tabIndex={-1}
 							aria-hidden="true"
 						/>
