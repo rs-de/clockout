@@ -2,6 +2,8 @@ import type { Handle, RemixNode } from "remix/ui"
 
 import { routes } from "../routes.ts"
 import { createTranslator, DEFAULT_LANG, type Lang } from "../utils/i18n.ts"
+import { Footer } from "./footer.tsx"
+import { Navbar } from "./navbar.tsx"
 
 export interface DocumentProps {
 	children?: RemixNode
@@ -36,10 +38,11 @@ export function Document(handle: Handle<DocumentProps>) {
 					{head}
 				</head>
 				<body>
-					{children}
-					<footer>
-						<a href="/about">{t("About clockout")}</a>
-					</footer>
+					<div class="app-root">
+						<Navbar />
+						<main class="app-main">{children}</main>
+						<Footer t={t} />
+					</div>
 					<script
 						type="module"
 						src={routes.assets.href({ path: "app/assets/entry.ts" })}

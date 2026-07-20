@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100">
+  <title>clockout</title>
+  <rect x="7" y="5" width="186" height="90" rx="100" ry="30" fill="#52a9ff" />
+  <text x="17" y="70" fill="white" font-size="70px" font-family="Courier">&lt;CO></text>
+</svg>

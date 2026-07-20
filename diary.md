@@ -137,3 +137,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 44. i18n: key translations by source text directly, drop the FNV-1a hash
     `(edit i18n.ts/i18n-sync.ts/de.ts; update global webapp-paradigms i18n.md)`
+
+45. Site shell: corporate-default header/footer (own brand, github differs)
+    `(add navbar.tsx/footer.tsx; edit document.tsx/app.css; i18n:sync)`

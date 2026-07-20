@@ -1,6 +1,7 @@
 // Generated/maintained by `pnpm i18n:sync` — do not hand-edit keys, only values.
 export const de: Record<string, string> = {
 	"A steady week": "Eine ruhige Woche",
+	About: "Über",
 	"About clockout": "Über clockout",
 	"Back to examples": "Zurück zu den Beispielen",
 	"Browser default": "Browserstandard",
@@ -14,10 +15,12 @@ export const de: Record<string, string> = {
 	"Forgot to stop on Friday": "Am Freitag zu stoppen vergessen",
 	"German (17.07.2026, 24h)": "Deutsch (17.07.2026, 24h)",
 	"ISO 8601 (2026-07-17, 24h)": "ISO 8601 (2026-07-17, 24h)",
+	Imprint: "Impressum",
 	"Lunch break": "Mittagspause",
 	"No data found for this link.": "Keine Daten für diesen Link gefunden.",
 	Password: "Passwort",
 	"Passwords don't match": "Passwörter stimmen nicht überein",
+	Privacy: "Datenschutz",
 	"Repeat password": "Passwort wiederholen",
 	"Save and start tracking": "Speichern und los ...",
 	"Save hours": "Stunden speichern",
@@ -32,6 +35,7 @@ export const de: Record<string, string> = {
 	"This browser doesn't have local data for this link.":
 		"Dieser Browser hat keine lokalen Daten für diesen Link.",
 	Unlock: "Entsperren",
+	"View on Github": "Auf GitHub ansehen",
 	"Week remaining: {duration}": "Verbleibend diese Woche: {duration}",
 	"Weekly target": "Wochenziel",
 	"Wrong password.": "Falsches Passwort.",
