@@ -143,3 +143,9 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 46. PWA setup: manifest, service worker, apple touch/splash icons wired in
     `(add sw.ts; edit assets.ts/routes.ts/controller.tsx/document.tsx/entry.ts)`
+
+47. Style setup/unlock forms with radix tokens; password-first + field hints
+    `(edit app.css: form/btn styles; edit app.tsx: reorder + hint copy; i18n)`
+
+48. Harvest "hint/error slot below input" pattern into paradigms + skill
+    `(add paradigms.md #2; edit global webapp-paradigms forms.md/SKILL.md)`

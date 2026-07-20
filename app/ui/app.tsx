@@ -297,6 +297,7 @@ export const App = clientEntry(
 
 				return (
 					<form
+						class="form-card"
 						mix={on("submit", (event) => {
 							event.preventDefault()
 							const formData = new FormData(event.currentTarget)
@@ -307,8 +308,10 @@ export const App = clientEntry(
 						})}
 					>
 						<h1>clockout</h1>
-						<p>{t("This browser doesn't have local data for this link.")}</p>
-						<label>
+						<p class="form-intro">
+							{t("This browser doesn't have local data for this link.")}
+						</p>
+						<label class="form-field">
 							{t("Password")}
 							<input
 								name="password"
@@ -317,8 +320,14 @@ export const App = clientEntry(
 								required
 							/>
 						</label>
-						{error && <p role="alert">{error}</p>}
-						<button type="submit">{t("Unlock")}</button>
+						{error && (
+							<p class="field-error" role="alert">
+								{error}
+							</p>
+						)}
+						<button type="submit" class="btn btn-primary">
+							{t("Unlock")}
+						</button>
 					</form>
 				)
 			}
@@ -326,6 +335,7 @@ export const App = clientEntry(
 			if (view.kind === "setup") {
 				return (
 					<form
+						class="form-card"
 						mix={on("submit", (event) => {
 							event.preventDefault()
 							void handleSetupSubmit(new FormData(event.currentTarget))
@@ -333,56 +343,13 @@ export const App = clientEntry(
 					>
 						<h1>clockout</h1>
 
-						<fieldset>
-							<legend>{t("Weekly target")}</legend>
-							<input
-								name="weeklyHours"
-								type="number"
-								min="0"
-								max="168"
-								defaultValue="35"
-							/>{" "}
-							{t("h")}
-							<input
-								name="weeklyMinutes"
-								type="number"
-								min="0"
-								max="59"
-								defaultValue="0"
-							/>{" "}
-							{t("m")}
-						</fieldset>
+						<p class="form-intro">
+							{t(
+								"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if this browser's storage is cleared or you open your link elsewhere.",
+							)}
+						</p>
 
-						<fieldset>
-							<legend>{t("Daily max")}</legend>
-							<input
-								name="dailyHours"
-								type="number"
-								min="0"
-								max="23"
-								defaultValue="9"
-							/>{" "}
-							{t("h")}
-							<input
-								name="dailyMinutes"
-								type="number"
-								min="0"
-								max="59"
-								defaultValue="55"
-							/>{" "}
-							{t("m")}
-						</fieldset>
-
-						<label>
-							{t("Date format")}
-							<select name="dateFormat" defaultValue="de">
-								<option value="de">{t("German (17.07.2026, 24h)")}</option>
-								<option value="iso">{t("ISO 8601 (2026-07-17, 24h)")}</option>
-								<option value="auto">{t("Browser default")}</option>
-							</select>
-						</label>
-
-						<label>
+						<label class="form-field">
 							{t("Password")}
 							<input
 								name="password"
@@ -395,7 +362,7 @@ export const App = clientEntry(
 							/>
 						</label>
 
-						<label>
+						<label class="form-field">
 							{t("Repeat password")}
 							<input
 								name="passwordRepeat"
@@ -408,7 +375,73 @@ export const App = clientEntry(
 							/>
 						</label>
 
-						<button type="submit">{t("Save and start tracking")}</button>
+						<fieldset>
+							<legend>{t("Weekly target")}</legend>
+							<div class="hm-row">
+								<input
+									name="weeklyHours"
+									type="number"
+									min="0"
+									max="168"
+									defaultValue="35"
+								/>
+								<span class="unit">{t("h")}</span>
+								<input
+									name="weeklyMinutes"
+									type="number"
+									min="0"
+									max="59"
+									defaultValue="0"
+								/>
+								<span class="unit">{t("m")}</span>
+							</div>
+							<p class="field-hint">
+								{t("Used to calculate how much time you have left this week.")}
+							</p>
+						</fieldset>
+
+						<fieldset>
+							<legend>{t("Daily max")}</legend>
+							<div class="hm-row">
+								<input
+									name="dailyHours"
+									type="number"
+									min="0"
+									max="23"
+									defaultValue="9"
+								/>
+								<span class="unit">{t("h")}</span>
+								<input
+									name="dailyMinutes"
+									type="number"
+									min="0"
+									max="59"
+									defaultValue="55"
+								/>
+								<span class="unit">{t("m")}</span>
+							</div>
+							<p class="field-hint">
+								{t("Used to calculate how much time you have left today.")}
+							</p>
+						</fieldset>
+
+						<div class="form-field">
+							<label class="form-field">
+								{t("Date format")}
+								<select name="dateFormat" defaultValue="de">
+									<option value="de">{t("German (17.07.2026, 24h)")}</option>
+									<option value="iso">{t("ISO 8601 (2026-07-17, 24h)")}</option>
+									<option value="auto">{t("Browser default")}</option>
+								</select>
+							</label>
+							<p class="field-hint">
+								{t("How dates and times are displayed throughout the app.")}
+							</p>
+						</div>
+
+						<button type="submit" class="btn btn-primary">
+							{t("Save and start tracking")}
+						</button>
 					</form>
 				)
 			}
@@ -560,7 +593,9 @@ function renderTrackingScreen(
 						)}
 					</p>
 					<ul>{weekList}</ul>
-					<button type="submit">{t("Save hours")}</button>
+					<button type="submit" class="btn btn-primary">
+						{t("Save hours")}
+					</button>
 				</form>
 			) : (
 				<ul>{weekList}</ul>
