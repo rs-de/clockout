@@ -1,3 +1,4 @@
+import { nanoid } from "nanoid"
 import { clientEntry, type Handle, on, type RemixNode } from "remix/ui"
 
 import {
@@ -39,7 +40,10 @@ import {
 
 type View =
 	| { kind: "loading" }
-	| { kind: "setup" }
+	// `id` is pre-generated (not just picked at submit time) so it can sit in
+	// a hidden autocomplete="username" field from the first render — letting
+	// password managers key the saved password to this doc from the start.
+	| { kind: "setup"; id: string }
 	| { kind: "unlock"; id: string; error?: string }
 	| { kind: "tracking"; data: TrackingData }
 	// In-memory only — see app/utils/examples.ts. `offsetMs` is the fixed
@@ -167,7 +171,7 @@ export const App = clientEntry(
 				view = { kind: "tracking", data }
 			} else {
 				const id = readDocIdFromUrl()
-				view = id ? { kind: "unlock", id } : { kind: "setup" }
+				view = id ? { kind: "unlock", id } : { kind: "setup", id: nanoid() }
 			}
 			handle.update()
 		})
@@ -196,12 +200,19 @@ export const App = clientEntry(
 			handle.update()
 		}
 
-		async function handleSetupSubmit(formData: FormData) {
-			const data = createTrackingData({
-				weeklyTargetMin: readMinutes(formData, "weeklyHours", "weeklyMinutes"),
-				dailyMax: readMinutes(formData, "dailyHours", "dailyMinutes"),
-				dateFormat: (formData.get("dateFormat") as DateFormat | null) ?? "de",
-			})
+		async function handleSetupSubmit(formData: FormData, id: string) {
+			const data = createTrackingData(
+				{
+					weeklyTargetMin: readMinutes(
+						formData,
+						"weeklyHours",
+						"weeklyMinutes",
+					),
+					dailyMax: readMinutes(formData, "dailyHours", "dailyMinutes"),
+					dateFormat: (formData.get("dateFormat") as DateFormat | null) ?? "de",
+				},
+				id,
+			)
 			await saveTrackingData(data)
 			sessionPassword = String(formData.get("password") ?? "")
 			view = { kind: "tracking", data }
@@ -311,6 +322,18 @@ export const App = clientEntry(
 						<p class="form-intro">
 							{t("This browser doesn't have local data for this link.")}
 						</p>
+						{/* Not user-facing — lets password managers key the saved
+						password to this specific doc instead of just the domain. */}
+						<input
+							class="sr-only"
+							name="username"
+							type="text"
+							autoComplete="username"
+							value={id}
+							readOnly
+							tabIndex={-1}
+							aria-hidden="true"
+						/>
 						<label class="form-field">
 							{t("Password")}
 							<input
@@ -333,21 +356,38 @@ export const App = clientEntry(
 			}
 
 			if (view.kind === "setup") {
+				const { id } = view
+
 				return (
 					<form
 						class="form-card"
 						mix={on("submit", (event) => {
 							event.preventDefault()
-							void handleSetupSubmit(new FormData(event.currentTarget))
+							void handleSetupSubmit(new FormData(event.currentTarget), id)
 						})}
 					>
 						<h1>clockout</h1>
 
 						<p class="form-intro">
 							{t(
-								"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if this browser's storage is cleared or you open your link elsewhere.",
+								"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if your browser cache is cleared or you open the link to your clockout on another device. Recommendation: use a password manager!",
 							)}
 						</p>
+
+						{/* Not user-facing — lets password managers key the saved
+						password to this specific doc instead of just the domain,
+						so a later visit to /d/:id (see the unlock form above)
+						autofills the right one. */}
+						<input
+							class="sr-only"
+							name="username"
+							type="text"
+							autoComplete="username"
+							value={id}
+							readOnly
+							tabIndex={-1}
+							aria-hidden="true"
+						/>
 
 						<label class="form-field">
 							{t("Password")}

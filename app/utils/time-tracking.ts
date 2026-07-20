@@ -32,14 +32,21 @@ export type TrackingData = {
 
 export const DEFAULT_DATE_FORMAT: DateFormat = "de"
 
+/**
+ * `id` can be supplied by the caller (e.g. one already generated to show in
+ * a hidden `autocomplete="username"` field before the user ever submits, so
+ * password managers key the saved password to the doc it actually belongs
+ * to) instead of always minting a fresh one here.
+ */
 export function createTrackingData(
 	settings: TrackingSettings = {
 		weeklyTargetMin: DEFAULT_WEEKLY_TARGET_MIN,
 		dailyMax: DEFAULT_DAILY_MAX,
 		dateFormat: DEFAULT_DATE_FORMAT,
 	},
+	id: string = nanoid(),
 ): TrackingData {
-	return { id: nanoid(), settings, events: [] }
+	return { id, settings, events: [] }
 }
 
 export type TrackingSummary = {

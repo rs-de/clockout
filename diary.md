@@ -149,3 +149,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 48. Harvest "hint/error slot below input" pattern into paradigms + skill
     `(add paradigms.md #2; edit global webapp-paradigms forms.md/SKILL.md)`
+
+49. Pre-generate doc id + hidden username field for password manager autofill
+    `(edit time-tracking.ts: id param; app.tsx: sr-only username; app.css)`

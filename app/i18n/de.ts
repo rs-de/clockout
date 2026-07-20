@@ -28,8 +28,8 @@ export const de: Record<string, string> = {
 	"Repeat password": "Passwort wiederholen",
 	"Save and start tracking": "Speichern und los ...",
 	"Save hours": "Stunden speichern",
-	"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if this browser's storage is cleared or you open your link elsewhere.":
-		"Vergib ein Passwort, um deine Daten vor der Online-Synchronisierung zu verschlüsseln — nur du kannst sie entschlüsseln. Du brauchst es nur erneut, wenn der Speicher dieses Browsers gelöscht wird oder du deinen Link auf einem anderen Gerät öffnest.",
+	"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if your browser cache is cleared or you open the link to your clockout on another device. Recommendation: use a password manager!":
+		"Vergib ein Passwort, um deine Daten vor der Online-Synchronisierung zu verschlüsseln — nur du kannst sie entschlüsseln. Du brauchst es nur erneut, wenn der Browser Cache gelöscht wird oder du den Link zu deinem clockout auf einem andern Gerät öffnest. Empfehlung: Benutze einen Passwort Manager!",
 	'Some days this week have no tracked hours yet. Enter how many hours you worked, or check "Did not work".':
 		'Für einige Tage dieser Woche sind noch keine Stunden erfasst. Trage ein, wie viele Stunden du gearbeitet hast, oder markiere "Nicht gearbeitet".',
 	Start: "Start",
