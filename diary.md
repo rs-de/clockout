@@ -140,3 +140,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 45. Site shell: corporate-default header/footer (own brand, github differs)
     `(add navbar.tsx/footer.tsx; edit document.tsx/app.css; i18n:sync)`
+
+46. PWA setup: manifest, service worker, apple touch/splash icons wired in
+    `(add sw.ts; edit assets.ts/routes.ts/controller.tsx/document.tsx/entry.ts)`

@@ -16,6 +16,8 @@ export const de: Record<string, string> = {
 	"German (17.07.2026, 24h)": "Deutsch (17.07.2026, 24h)",
 	"ISO 8601 (2026-07-17, 24h)": "ISO 8601 (2026-07-17, 24h)",
 	Imprint: "Impressum",
+	"Lean, private time tracking that shows how much time is left today and this week.":
+		"Schlanke, private Zeiterfassung, die zeigt, wie viel Zeit heute und diese Woche noch bleibt.",
 	"Lunch break": "Mittagspause",
 	"No data found for this link.": "Keine Daten für diesen Link gefunden.",
 	Password: "Passwort",
