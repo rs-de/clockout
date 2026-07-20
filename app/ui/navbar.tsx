@@ -13,7 +13,7 @@ export function Navbar(_handle: Handle) {
 							src="/logo.svg"
 							class="app-nav__logo"
 						/>
-						<b>clockout</b>
+						<b>ClockOut</b>
 					</div>
 					<div class="app-nav__brand-sub">
 						<small>Simple time tracking</small>

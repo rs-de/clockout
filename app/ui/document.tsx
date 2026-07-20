@@ -66,6 +66,10 @@ export function Document(handle: Handle<DocumentProps>) {
 					<link rel="manifest" href="/manifest.webmanifest" />
 					<link rel="apple-touch-icon" href="/icons/apple-icon-180.png" />
 					<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+					{/* apple-mobile-web-app-capable is deprecated in favor of the
+					standard mobile-web-app-capable, but Safari/iOS still only
+					honors the apple-prefixed one — keep both. */}
+					<meta name="mobile-web-app-capable" content="yes" />
 					<meta name="apple-mobile-web-app-capable" content="yes" />
 					{APPLE_SPLASH_SCREENS.map(({ href, media }) => (
 						<link rel="apple-touch-startup-image" href={href} media={media} />
