@@ -480,16 +480,23 @@ export const App = clientEntry(
 
 			if (view.kind === "tracking") {
 				const { data } = view
-				return renderTrackingScreen(
-					data,
-					new Date(),
-					() => void handleToggle(data),
-					(days, formData) => void handleCatchupSubmit(data, days, formData),
-					t,
-					undefined,
-					syncStatusLabel(syncEngine.getStatus(), t) && (
-						<p role="status">{syncStatusLabel(syncEngine.getStatus(), t)}</p>
-					),
+				return (
+					<TrackingScreen
+						data={data}
+						now={new Date()}
+						onToggle={() => void handleToggle(data)}
+						onCatchupSubmit={(days, formData) =>
+							void handleCatchupSubmit(data, days, formData)
+						}
+						t={t}
+						footer={
+							syncStatusLabel(syncEngine.getStatus(), t) && (
+								<p role="status">
+									{syncStatusLabel(syncEngine.getStatus(), t)}
+								</p>
+							)
+						}
+					/>
 				)
 			}
 
@@ -497,160 +504,172 @@ export const App = clientEntry(
 			const now = new Date(Date.now() + offsetMs)
 			const dateTime = `${formatWeekdayName(now, data.settings.dateFormat, "long")}, ${formatClockTime(now, data.settings.dateFormat)}`
 
-			return renderTrackingScreen(
-				data,
-				now,
-				() => handleExampleToggle(data, now),
-				(days, formData) => handleExampleCatchupSubmit(data, days, formData),
-				t,
-				<p role="status">
-					{t('Demo: simulating "{name}" — {dateTime}. Nothing here is saved.', {
-						name: t(example.title),
-						dateTime,
-					})}{" "}
-					<a href="/about">{t("Back to examples")}</a>
-				</p>,
+			return (
+				<TrackingScreen
+					data={data}
+					now={now}
+					onToggle={() => handleExampleToggle(data, now)}
+					onCatchupSubmit={(days, formData) =>
+						handleExampleCatchupSubmit(data, days, formData)
+					}
+					t={t}
+					banner={
+						<p role="status">
+							{t(
+								'Demo: simulating "{name}" — {dateTime}. Nothing here is saved.',
+								{ name: t(example.title), dateTime },
+							)}{" "}
+							<a href="/about">{t("Back to examples")}</a>
+						</p>
+					}
+				/>
 			)
 		}
 	},
 )
 
-function renderTrackingScreen(
-	data: TrackingData,
-	now: Date,
-	onToggle: () => void,
-	onCatchupSubmit: (days: Date[], formData: FormData) => void,
-	t: Translator,
-	banner?: RemixNode,
-	footer?: RemixNode,
-) {
-	const entryDays = weeklyEntryDays(data.events, now)
-	const entryDayIndex = new Map(entryDays.map((day, i) => [day.getTime(), i]))
-	const summary = summarize(data, now)
+type TrackingScreenProps = {
+	data: TrackingData
+	now: Date
+	onToggle: () => void
+	onCatchupSubmit: (days: Date[], formData: FormData) => void
+	t: Translator
+	banner?: RemixNode
+	footer?: RemixNode
+}
 
-	const weekList = weeklyBreakdown(data.events, now).map(
-		({ day, workedSec }) => {
-			const label = `${formatWeekdayName(day, data.settings.dateFormat, "short")}, ${formatDayMonth(day, data.settings.dateFormat)}`
-			const i = entryDayIndex.get(day.getTime())
+function TrackingScreen(handle: Handle<TrackingScreenProps>) {
+	return () => {
+		const { data, now, onToggle, onCatchupSubmit, t, banner, footer } =
+			handle.props
+		const entryDays = weeklyEntryDays(data.events, now)
+		const entryDayIndex = new Map(entryDays.map((day, i) => [day.getTime(), i]))
+		const summary = summarize(data, now)
 
-			if (i === undefined) {
+		const weekList = weeklyBreakdown(data.events, now).map(
+			({ day, workedSec }) => {
+				const label = `${formatWeekdayName(day, data.settings.dateFormat, "short")}, ${formatDayMonth(day, data.settings.dateFormat)}`
+				const i = entryDayIndex.get(day.getTime())
+
+				if (i === undefined) {
+					return (
+						<li key={day.getTime()} className="data-row">
+							{label}: {formatDuration(workedSec)}
+						</li>
+					)
+				}
+
+				// A weekend day only ever reaches this pending-entry branch because
+				// its own Friday wasn't stopped, not because the weekend itself is
+				// likely worked — so pre-check "Did not work" for it (Friday stays
+				// unchecked, since that's the day that actually needs real hours).
+				const isWeekend = day.getDay() === 0 || day.getDay() === 6
+
 				return (
-					<li key={day.getTime()} className="data-row">
-						{label}: {formatDuration(workedSec)}
+					<li key={day.getTime()}>
+						<fieldset>
+							<legend>{label}</legend>
+							<input
+								name={`day-${i}-hours`}
+								type="number"
+								min="0"
+								max="23"
+								defaultValue="0"
+								disabled={isWeekend}
+							/>{" "}
+							{t("h")}
+							<input
+								name={`day-${i}-minutes`}
+								type="number"
+								min="0"
+								max="59"
+								defaultValue="0"
+								disabled={isWeekend}
+							/>{" "}
+							{t("m")}
+							<label>
+								<input
+									name={`day-${i}-skip`}
+									type="checkbox"
+									defaultChecked={isWeekend}
+									mix={on("change", (event) => {
+										toggleCatchupDayFields(
+											event.currentTarget.closest("fieldset"),
+											event.currentTarget.checked,
+										)
+									})}
+								/>{" "}
+								{t("Did not work")}
+							</label>
+						</fieldset>
 					</li>
 				)
-			}
+			},
+		)
 
-			// A weekend day only ever reaches this pending-entry branch because
-			// its own Friday wasn't stopped, not because the weekend itself is
-			// likely worked — so pre-check "Did not work" for it (Friday stays
-			// unchecked, since that's the day that actually needs real hours).
-			const isWeekend = day.getDay() === 0 || day.getDay() === 6
-
-			return (
-				<li key={day.getTime()}>
-					<fieldset>
-						<legend>{label}</legend>
-						<input
-							name={`day-${i}-hours`}
-							type="number"
-							min="0"
-							max="23"
-							defaultValue="0"
-							disabled={isWeekend}
-						/>{" "}
-						{t("h")}
-						<input
-							name={`day-${i}-minutes`}
-							type="number"
-							min="0"
-							max="59"
-							defaultValue="0"
-							disabled={isWeekend}
-						/>{" "}
-						{t("m")}
-						<label>
-							<input
-								name={`day-${i}-skip`}
-								type="checkbox"
-								defaultChecked={isWeekend}
-								mix={on("change", (event) => {
-									toggleCatchupDayFields(
-										event.currentTarget.closest("fieldset"),
-										event.currentTarget.checked,
-									)
-								})}
-							/>{" "}
-							{t("Did not work")}
-						</label>
-					</fieldset>
-				</li>
-			)
-		},
-	)
-
-	return (
-		<div>
-			{banner}
-			<p>
-				{t("Week remaining: {duration}", {
-					duration: formatDuration(summary.weeklyRemainingSec),
-				})}
-			</p>
-			<p>
-				{t("Day remaining: {duration}", {
-					duration: formatDuration(summary.dailyRemainingSec),
-				})}
-			</p>
-			{summary.startedAt !== null && (
+		return (
+			<div>
+				{banner}
 				<p>
-					{t("Started at {time}", {
-						time: formatClockTime(
-							new Date(summary.startedAt * 1000),
-							data.settings.dateFormat,
-						),
+					{t("Week remaining: {duration}", {
+						duration: formatDuration(summary.weeklyRemainingSec),
 					})}
 				</p>
-			)}
-			{entryDays.length > 0 ? (
-				<form
-					mix={on("submit", (event) => {
-						event.preventDefault()
-						onCatchupSubmit(entryDays, new FormData(event.currentTarget))
+				<p>
+					{t("Day remaining: {duration}", {
+						duration: formatDuration(summary.dailyRemainingSec),
 					})}
-				>
+				</p>
+				{summary.startedAt !== null && (
 					<p>
-						{t(
-							'Some days this week have no tracked hours yet. Enter how many hours you worked, or check "Did not work".',
-						)}
+						{t("Started at {time}", {
+							time: formatClockTime(
+								new Date(summary.startedAt * 1000),
+								data.settings.dateFormat,
+							),
+						})}
 					</p>
-					<ul>{weekList}</ul>
-					<button type="submit" class="btn btn-primary">
-						{t("Save hours")}
-					</button>
-				</form>
-			) : (
-				<ul>{weekList}</ul>
-			)}
-			{
-				// A dangling start from an earlier day (not today) has nothing
-				// live to "stop" — closing it here would just slap a "stop" on
-				// it at whatever moment this button happens to get clicked,
-				// silently collapsing the whole unresolved gap (including any
-				// still-dangling weekend) into one bogus multi-day session.
-				// Only the catch-up form above can close it correctly, per day.
-				!(summary.isRunning && summary.startedAt === null) && (
-					<button
-						type="button"
-						className="toggle-button"
-						mix={on("click", onToggle)}
-						data-running={summary.isRunning}
+				)}
+				{entryDays.length > 0 ? (
+					<form
+						mix={on("submit", (event) => {
+							event.preventDefault()
+							onCatchupSubmit(entryDays, new FormData(event.currentTarget))
+						})}
 					>
-						{summary.isRunning ? t("Stop") : t("Start")}
-					</button>
-				)
-			}
-			{footer}
-		</div>
-	)
+						<p>
+							{t(
+								'Some days this week have no tracked hours yet. Enter how many hours you worked, or check "Did not work".',
+							)}
+						</p>
+						<ul>{weekList}</ul>
+						<button type="submit" class="btn btn-primary">
+							{t("Save hours")}
+						</button>
+					</form>
+				) : (
+					<ul>{weekList}</ul>
+				)}
+				{
+					// A dangling start from an earlier day (not today) has nothing
+					// live to "stop" — closing it here would just slap a "stop" on
+					// it at whatever moment this button happens to get clicked,
+					// silently collapsing the whole unresolved gap (including any
+					// still-dangling weekend) into one bogus multi-day session.
+					// Only the catch-up form above can close it correctly, per day.
+					!(summary.isRunning && summary.startedAt === null) && (
+						<button
+							type="button"
+							className="toggle-button"
+							mix={on("click", onToggle)}
+							data-running={summary.isRunning}
+						>
+							{summary.isRunning ? t("Stop") : t("Start")}
+						</button>
+					)
+				}
+				{footer}
+			</div>
+		)
+	}
 }
