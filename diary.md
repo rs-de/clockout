@@ -161,3 +161,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 52. Fix: dev server never picked up file edits (watch:false meant for prod)
     `(edit assets.ts: watch: false -> watch: isDevelopment)`
+
+53. Adopt Open Props tokens for border-size/spacing/duration (drop 2 dead vars)
+    `(pnpm add open-props; @import in app.css; also dropped dead --color-border)`

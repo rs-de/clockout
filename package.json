@@ -22,6 +22,7 @@
 	"packageManager": "pnpm@10.6.2",
 	"dependencies": {
 		"nanoid": "^6.0.0",
+		"open-props": "^1.7.23",
 		"remix": "^3.0.0-beta.5"
 	},
 	"devDependencies": {
