@@ -24,6 +24,7 @@ import {
 	saveSyncKey,
 	saveTrackingData,
 } from "../utils/local-store.ts"
+import { createSyncEngine, type SyncStatus } from "../utils/sync-engine.ts"
 import {
 	createTrackingData,
 	type DateFormat,
@@ -39,9 +40,7 @@ import {
 	decryptTrackingData,
 	deriveTrackingKey,
 	deserializeEncryptedDocument,
-	encryptTrackingData,
 	type SerializedEncryptedDocument,
-	serializeEncryptedDocument,
 	type TrackingSyncKey,
 } from "../utils/tracking-document.ts"
 
@@ -57,8 +56,6 @@ type View =
 	// gap between the example's pretend "now" and the real clock, captured
 	// once at load so the pretend clock still ticks forward live.
 	| { kind: "example"; data: TrackingData; example: Example; offsetMs: number }
-
-type SyncStatus = "idle" | "syncing" | "synced" | "error"
 
 const DOC_URL_PATTERN = /^\/d\/([A-Za-z0-9_-]+)$/
 const EXAMPLE_URL_PATTERN = /^\/example\/([a-z0-9-]+)$/
@@ -158,7 +155,7 @@ export const App = clientEntry(
 		// later reload can rehydrate it below without asking for the password
 		// again — only a fresh browser/cleared storage needs to unlock.
 		let sessionKey: TrackingSyncKey | null = null
-		let syncStatus: SyncStatus = "idle"
+		const syncEngine = createSyncEngine(() => handle.update())
 
 		handle.queueTask(async (signal) => {
 			// An example URL always wins, even over existing real local data —
@@ -189,23 +186,7 @@ export const App = clientEntry(
 		if (typeof window !== "undefined") {
 			const interval = setInterval(() => handle.update(), 1000)
 			handle.signal.addEventListener("abort", () => clearInterval(interval))
-		}
-
-		async function syncToServer(data: TrackingData, syncKey: TrackingSyncKey) {
-			syncStatus = "syncing"
-			handle.update()
-			try {
-				const doc = await encryptTrackingData(data, syncKey)
-				const response = await fetch(`/sync/${encodeURIComponent(data.id)}`, {
-					method: "PUT",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(serializeEncryptedDocument(doc)),
-				})
-				syncStatus = response.ok ? "synced" : "error"
-			} catch {
-				syncStatus = "error"
-			}
-			handle.update()
+			syncEngine.init(handle.signal)
 		}
 
 		async function handleSetupSubmit(formData: FormData, id: string) {
@@ -231,7 +212,7 @@ export const App = clientEntry(
 			// Makes the URL bookmarkable so it can be used to recover this
 			// document later if local storage gets cleared.
 			window.history.replaceState(null, "", `/d/${data.id}`)
-			void syncToServer(data, sessionKey)
+			syncEngine.sync(data, sessionKey)
 		}
 
 		async function handleUnlockSubmit(id: string, unlockPassword: string) {
@@ -274,14 +255,14 @@ export const App = clientEntry(
 			)
 			await saveTrackingData(data)
 			handle.update()
-			if (sessionKey) void syncToServer(data, sessionKey)
+			if (sessionKey) syncEngine.sync(data, sessionKey)
 		}
 
 		async function handleToggle(data: TrackingData) {
 			data.events = toggleTracking(data.events, Math.floor(Date.now() / 1000))
 			await saveTrackingData(data)
 			handle.update()
-			if (sessionKey) void syncToServer(data, sessionKey)
+			if (sessionKey) syncEngine.sync(data, sessionKey)
 		}
 
 		// Example handlers mirror the real ones above but stay in-memory only —
@@ -506,8 +487,8 @@ export const App = clientEntry(
 					(days, formData) => void handleCatchupSubmit(data, days, formData),
 					t,
 					undefined,
-					syncStatusLabel(syncStatus, t) && (
-						<p role="status">{syncStatusLabel(syncStatus, t)}</p>
+					syncStatusLabel(syncEngine.getStatus(), t) && (
+						<p role="status">{syncStatusLabel(syncEngine.getStatus(), t)}</p>
 					),
 				)
 			}

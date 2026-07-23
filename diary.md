@@ -155,3 +155,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 50. Persist derived sync key so reopening the app never re-asks for password
     `(split key-derivation from encrypt/decrypt; add sync-key IDB store)`
+
+51. Coalescing sync engine: abort-superseded + gen-counter + backoff retry
+    `(add app/utils/sync-engine.ts, adapted from shopping-list2's pattern)`
