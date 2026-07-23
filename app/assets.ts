@@ -35,7 +35,10 @@ export const assetServer = createAssetServer({
 	deny: ["app/**/*.server.*"],
 	sourceMaps: isDevelopment ? "external" : undefined,
 	minify: !isDevelopment,
-	watch: false,
+	// Off in prod: fingerprinting assumes files on disk won't change (see
+	// README). On in dev, or edits like this one never take effect without
+	// a server restart.
+	watch: isDevelopment,
 	scripts: {
 		define: {
 			"process.env.NODE_ENV": JSON.stringify(nodeEnv),

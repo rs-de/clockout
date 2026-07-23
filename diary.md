@@ -158,3 +158,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 51. Coalescing sync engine: abort-superseded + gen-counter + backoff retry
     `(add app/utils/sync-engine.ts, adapted from shopping-list2's pattern)`
+
+52. Fix: dev server never picked up file edits (watch:false meant for prod)
+    `(edit assets.ts: watch: false -> watch: isDevelopment)`
