@@ -3,10 +3,13 @@ import assert from "node:assert/strict"
 import { afterEach, describe, test } from "node:test"
 import {
 	clearTrackingData,
+	loadSyncKey,
 	loadTrackingData,
+	saveSyncKey,
 	saveTrackingData,
 } from "../app/utils/local-store.ts"
 import { createTrackingData } from "../app/utils/time-tracking.ts"
+import { deriveTrackingKey } from "../app/utils/tracking-document.ts"
 
 describe("local-store", () => {
 	afterEach(async () => {
@@ -43,5 +46,27 @@ describe("local-store", () => {
 		await clearTrackingData()
 
 		assert.equal(await loadTrackingData(), undefined)
+	})
+
+	test("returns undefined when no sync key has been saved", async () => {
+		assert.equal(await loadSyncKey(), undefined)
+	})
+
+	test("round-trips a saved sync key, still usable for decrypt", async () => {
+		const syncKey = await deriveTrackingKey("correct horse battery staple")
+
+		await saveSyncKey(syncKey)
+		const loaded = await loadSyncKey()
+
+		assert.ok(loaded)
+		assert.deepEqual(loaded.salt, syncKey.salt)
+		assert.equal(loaded.key.extractable, false)
+	})
+
+	test("clearTrackingData also removes the saved sync key", async () => {
+		await saveSyncKey(await deriveTrackingKey("correct horse battery staple"))
+		await clearTrackingData()
+
+		assert.equal(await loadSyncKey(), undefined)
 	})
 })

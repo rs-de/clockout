@@ -18,7 +18,12 @@ import {
 	type Lang,
 	type Translator,
 } from "../utils/i18n.ts"
-import { loadTrackingData, saveTrackingData } from "../utils/local-store.ts"
+import {
+	loadSyncKey,
+	loadTrackingData,
+	saveSyncKey,
+	saveTrackingData,
+} from "../utils/local-store.ts"
 import {
 	createTrackingData,
 	type DateFormat,
@@ -32,10 +37,12 @@ import {
 } from "../utils/time-tracking.ts"
 import {
 	decryptTrackingData,
+	deriveTrackingKey,
 	deserializeEncryptedDocument,
 	encryptTrackingData,
 	type SerializedEncryptedDocument,
 	serializeEncryptedDocument,
+	type TrackingSyncKey,
 } from "../utils/tracking-document.ts"
 
 type View =
@@ -147,10 +154,10 @@ export const App = clientEntry(
 		// request (see controller.tsx) and never changes mid-session.
 		const t = createTranslator(handle.props.lang ?? DEFAULT_LANG)
 
-		// Set once setup succeeds; kept in memory for the rest of this page load
-		// only (never persisted). A reload that finds data already in local
-		// storage never needs it — see requirement #4.
-		let sessionPassword: string | null = null
+		// Set once setup/unlock succeeds, and persisted via saveSyncKey so a
+		// later reload can rehydrate it below without asking for the password
+		// again — only a fresh browser/cleared storage needs to unlock.
+		let sessionKey: TrackingSyncKey | null = null
 		let syncStatus: SyncStatus = "idle"
 
 		handle.queueTask(async (signal) => {
@@ -169,6 +176,7 @@ export const App = clientEntry(
 			if (signal.aborted) return
 			if (data) {
 				view = { kind: "tracking", data }
+				sessionKey = (await loadSyncKey()) ?? null
 			} else {
 				const id = readDocIdFromUrl()
 				view = id ? { kind: "unlock", id } : { kind: "setup", id: nanoid() }
@@ -183,11 +191,11 @@ export const App = clientEntry(
 			handle.signal.addEventListener("abort", () => clearInterval(interval))
 		}
 
-		async function syncToServer(data: TrackingData, password: string) {
+		async function syncToServer(data: TrackingData, syncKey: TrackingSyncKey) {
 			syncStatus = "syncing"
 			handle.update()
 			try {
-				const doc = await encryptTrackingData(data, password)
+				const doc = await encryptTrackingData(data, syncKey)
 				const response = await fetch(`/sync/${encodeURIComponent(data.id)}`, {
 					method: "PUT",
 					headers: { "Content-Type": "application/json" },
@@ -214,13 +222,16 @@ export const App = clientEntry(
 				id,
 			)
 			await saveTrackingData(data)
-			sessionPassword = String(formData.get("password") ?? "")
+			sessionKey = await deriveTrackingKey(
+				String(formData.get("password") ?? ""),
+			)
+			await saveSyncKey(sessionKey)
 			view = { kind: "tracking", data }
 			handle.update()
 			// Makes the URL bookmarkable so it can be used to recover this
 			// document later if local storage gets cleared.
 			window.history.replaceState(null, "", `/d/${data.id}`)
-			void syncToServer(data, sessionPassword)
+			void syncToServer(data, sessionKey)
 		}
 
 		async function handleUnlockSubmit(id: string, unlockPassword: string) {
@@ -234,9 +245,11 @@ export const App = clientEntry(
 			const serialized = (await response.json()) as SerializedEncryptedDocument
 			const doc = deserializeEncryptedDocument(serialized)
 			try {
-				const data = await decryptTrackingData(doc, unlockPassword)
+				const syncKey = await deriveTrackingKey(unlockPassword, doc.salt)
+				const data = await decryptTrackingData(doc, syncKey)
 				await saveTrackingData(data)
-				sessionPassword = unlockPassword
+				await saveSyncKey(syncKey)
+				sessionKey = syncKey
 				view = { kind: "tracking", data }
 			} catch {
 				view = { kind: "unlock", id, error: t("Wrong password.") }
@@ -261,14 +274,14 @@ export const App = clientEntry(
 			)
 			await saveTrackingData(data)
 			handle.update()
-			if (sessionPassword) void syncToServer(data, sessionPassword)
+			if (sessionKey) void syncToServer(data, sessionKey)
 		}
 
 		async function handleToggle(data: TrackingData) {
 			data.events = toggleTracking(data.events, Math.floor(Date.now() / 1000))
 			await saveTrackingData(data)
 			handle.update()
-			if (sessionPassword) void syncToServer(data, sessionPassword)
+			if (sessionKey) void syncToServer(data, sessionKey)
 		}
 
 		// Example handlers mirror the real ones above but stay in-memory only —

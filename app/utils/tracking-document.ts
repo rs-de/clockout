@@ -22,26 +22,36 @@ export type EncryptedTrackingDocument = {
 
 type TrackingPayload = Pick<TrackingData, "settings" | "events">
 
+/** A password-derived key, cached so repeat syncs skip re-running PBKDF2. */
+export type TrackingSyncKey = { key: CryptoKey; salt: Uint8Array<ArrayBuffer> }
+
+/** Only needed once per document: at setup (fresh salt) or unlock (server's salt). */
+export async function deriveTrackingKey(
+	password: string,
+	salt: Uint8Array<ArrayBuffer> = randomSalt(),
+): Promise<TrackingSyncKey> {
+	return { key: await deriveKey(password, salt), salt }
+}
+
+/** Encrypts with an already-derived key — see `deriveTrackingKey`. */
 export async function encryptTrackingData(
 	data: TrackingData,
-	password: string,
+	syncKey: TrackingSyncKey,
 ): Promise<EncryptedTrackingDocument> {
-	const salt = randomSalt()
-	const key = await deriveKey(password, salt)
 	const payload: TrackingPayload = {
 		settings: data.settings,
 		events: data.events,
 	}
-	const { iv, ciphertext } = await encrypt(JSON.stringify(payload), key)
-	return { id: data.id, salt, iv, ciphertext }
+	const { iv, ciphertext } = await encrypt(JSON.stringify(payload), syncKey.key)
+	return { id: data.id, salt: syncKey.salt, iv, ciphertext }
 }
 
+/** Decrypts with an already-derived key — pass `deriveTrackingKey(password, doc.salt)`. */
 export async function decryptTrackingData(
 	doc: EncryptedTrackingDocument,
-	password: string,
+	syncKey: TrackingSyncKey,
 ): Promise<TrackingData> {
-	const key = await deriveKey(password, doc.salt)
-	const plaintext = await decrypt(doc.ciphertext, doc.iv, key)
+	const plaintext = await decrypt(doc.ciphertext, doc.iv, syncKey.key)
 	const payload = JSON.parse(plaintext) as TrackingPayload
 	return { id: doc.id, settings: payload.settings, events: payload.events }
 }

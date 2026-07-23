@@ -26,7 +26,11 @@ test("setup creates tracking data, toggling persists across reload", async ({
 	await page.reload()
 	await expect(page.getByRole("button", { name: "Stop" })).toBeVisible()
 
+	// The reload must have rehydrated the sync key from IndexedDB, not just
+	// the plaintext tracking data — otherwise this edit would silently stop
+	// pushing to the server until the password is re-entered.
 	await page.getByRole("button", { name: "Stop" }).click()
+	await expect(page.getByRole("status")).toHaveText("Synced")
 	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
 })
 

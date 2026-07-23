@@ -152,3 +152,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 49. Pre-generate doc id + hidden username field for password manager autofill
     `(edit time-tracking.ts: id param; app.tsx: sr-only username; app.css)`
+
+50. Persist derived sync key so reopening the app never re-asks for password
+    `(split key-derivation from encrypt/decrypt; add sync-key IDB store)`
