@@ -161,3 +161,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 52. Fix: dev server never picked up file edits (watch:false meant for prod)
     `(edit assets.ts: watch: false -> watch: isDevelopment)`
+
+53. Wire Tailwind CSS v4 build pipeline (CLI compile step, not linked in yet)
+    `(add tailwind.css/tailwindcss deps; dev/build scripts; Dockerfile step)`

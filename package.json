@@ -4,11 +4,14 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
-		"start": "NODE_ENV=production node --import remix/node-tsx server.ts",
+		"dev": "concurrently -n server,tailwind -k \"pnpm dev:server\" \"pnpm tailwind:watch\"",
+		"dev:server": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
+		"start": "pnpm tailwind:build && NODE_ENV=production node --import remix/node-tsx server.ts",
+		"tailwind:build": "tailwindcss -i app/assets/tailwind.css -o app/assets/tailwind.generated.css",
+		"tailwind:watch": "tailwindcss -i app/assets/tailwind.css -o app/assets/tailwind.generated.css --watch=always",
 		"test": "pnpm test:unit && pnpm test:e2e",
 		"test:unit": "NODE_ENV=test node --import remix/node-tsx --test",
-		"test:e2e": "playwright test",
+		"test:e2e": "pnpm tailwind:build && playwright test",
 		"i18n:sync": "node --import remix/node-tsx scripts/i18n-sync.ts",
 		"i18n:check": "node --import remix/node-tsx scripts/i18n-sync.ts --check",
 		"typecheck": "tsc --noEmit",
@@ -20,6 +23,11 @@
 		"node": ">=24"
 	},
 	"packageManager": "pnpm@10.6.2",
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"@parcel/watcher"
+		]
+	},
 	"dependencies": {
 		"nanoid": "^6.0.0",
 		"remix": "^3.0.0-beta.5"
@@ -27,9 +35,12 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.3",
 		"@playwright/test": "^1.61.1",
+		"@tailwindcss/cli": "^4.3.3",
 		"@types/node": "26.1.1",
+		"concurrently": "^10.0.3",
 		"fake-indexeddb": "^6.2.5",
 		"playwright": "^1.61.1",
+		"tailwindcss": "^4.3.3",
 		"typescript": "7.0.2"
 	}
 }

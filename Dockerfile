@@ -10,6 +10,7 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+RUN pnpm tailwind:build
 
 ENV NODE_ENV=production
 ENV PORT=8080
