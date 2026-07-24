@@ -1,6 +1,8 @@
 @import "../../node_modules/open-props/borders.min.css";
 @import "../../node_modules/open-props/sizes.min.css";
 @import "../../node_modules/open-props/durations.min.css";
+@import "../../node_modules/open-props/fonts.min.css";
+@import "../../node_modules/open-props/zindex.min.css";
 
 :root {
 	--color-bg: #ffffff;
@@ -81,7 +83,7 @@ body {
 	margin: 0;
 	background: var(--color-bg);
 	color: var(--color-text);
-	font-family: system-ui, sans-serif;
+	font-family: var(--font-sans);
 }
 
 small {
@@ -115,7 +117,10 @@ small {
 .app-nav {
 	position: sticky;
 	top: 0;
-	z-index: 10;
+	/* --layer-5 (5) is Open Props' topmost non-"important" step, not literally
+	   10 — z-index is ordinal, and nothing else on the page has one, so the
+	   exact number doesn't matter, only "above everything else" does. */
+	z-index: var(--layer-5);
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -263,21 +268,21 @@ small {
 	margin: 0;
 	color: hsl(var(--slate-11));
 	font-size: 0.9375rem;
-	line-height: 1.5;
+	line-height: var(--font-lineheight-3);
 }
 
 .form-field {
 	display: flex;
 	flex-direction: column;
 	gap: 0.375rem;
-	font-weight: 600;
+	font-weight: var(--font-weight-6);
 	color: hsl(var(--slate-12));
 }
 
 .field-hint {
 	margin: 0.375rem 0 0;
 	font-size: 0.8125rem;
-	font-weight: 400;
+	font-weight: var(--font-weight-4);
 	color: hsl(var(--slate-11));
 }
 
@@ -311,7 +316,7 @@ fieldset {
 
 legend {
 	padding: 0 0.25rem;
-	font-weight: 600;
+	font-weight: var(--font-weight-6);
 	color: hsl(var(--slate-12));
 }
 
@@ -391,7 +396,7 @@ select:disabled {
 }
 
 .btn-primary {
-	font-weight: 700;
+	font-weight: var(--font-weight-7);
 	color: hsl(var(--primary-11));
 	border: var(--border-size-2) solid hsl(var(--primary-8));
 	background: hsl(var(--primary-3));

@@ -164,3 +164,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 53. Adopt Open Props tokens for border-size/spacing/duration (drop 2 dead vars)
     `(pnpm add open-props; @import in app.css; also dropped dead --color-border)`
+
+54. Extend Open Props coverage: font-weight/line-height/z-index/font-sans
+    `(add fonts.min.css/zindex.min.css imports; skip risky --font-mono swap)`
