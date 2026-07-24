@@ -443,6 +443,15 @@ select:disabled {
 	line-height: var(--font-lineheight-3);
 }
 
+.time-banner a {
+	color: hsl(var(--primary-11));
+	font-weight: var(--font-weight-6);
+}
+
+.time-banner a:hover {
+	color: hsl(var(--primary-12));
+}
+
 .time-stats {
 	display: flex;
 	flex-direction: column;

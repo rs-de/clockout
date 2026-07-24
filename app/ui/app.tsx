@@ -138,6 +138,27 @@ function syncPasswordMatchValidity(
 	)
 }
 
+// Safari/WebKit-only: focusing a number input by click still lets the native
+// mouseup that follows place the caret at the click position afterward,
+// silently collapsing the selection `.select()` just made on focus (Tab
+// focus has no such mouseup, so it's unaffected there). Track "just focused
+// by this click" per element and re-assert the selection once on the
+// following mouseup only, so a later click on an already-focused field still
+// positions the caret normally instead of re-selecting everything.
+const justFocusedByClick = new WeakSet<HTMLInputElement>()
+
+function selectOnFocus(input: HTMLInputElement) {
+	justFocusedByClick.add(input)
+	input.select()
+}
+
+function reassertSelectOnMouseUp(input: HTMLInputElement, event: Event) {
+	if (!justFocusedByClick.has(input)) return
+	justFocusedByClick.delete(input)
+	event.preventDefault()
+	input.select()
+}
+
 export interface AppProps {
 	lang?: Lang
 }
@@ -422,7 +443,12 @@ export const App = clientEntry(
 									max="168"
 									defaultValue="35"
 									aria-label={`${t("Weekly target")} ${t("h")}`}
-									mix={on("focus", (event) => event.currentTarget.select())}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
 								/>
 								<span class="unit" aria-hidden="true">
 									{t("h")}
@@ -434,7 +460,12 @@ export const App = clientEntry(
 									max="59"
 									defaultValue="0"
 									aria-label={`${t("Weekly target")} ${t("m")}`}
-									mix={on("focus", (event) => event.currentTarget.select())}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
 								/>
 								<span class="unit" aria-hidden="true">
 									{t("m")}
@@ -455,7 +486,12 @@ export const App = clientEntry(
 									max="23"
 									defaultValue="9"
 									aria-label={`${t("Daily max")} ${t("h")}`}
-									mix={on("focus", (event) => event.currentTarget.select())}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
 								/>
 								<span class="unit" aria-hidden="true">
 									{t("h")}
@@ -467,7 +503,12 @@ export const App = clientEntry(
 									max="59"
 									defaultValue="55"
 									aria-label={`${t("Daily max")} ${t("m")}`}
-									mix={on("focus", (event) => event.currentTarget.select())}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
 								/>
 								<span class="unit" aria-hidden="true">
 									{t("m")}
@@ -602,7 +643,12 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 									defaultValue="0"
 									disabled={isWeekend}
 									aria-label={`${label} ${t("h")}`}
-									mix={on("focus", (event) => event.currentTarget.select())}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
 								/>
 								<span class="unit" aria-hidden="true">
 									{t("h")}
@@ -615,7 +661,12 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 									defaultValue="0"
 									disabled={isWeekend}
 									aria-label={`${label} ${t("m")}`}
-									mix={on("focus", (event) => event.currentTarget.select())}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
 								/>
 								<span class="unit" aria-hidden="true">
 									{t("m")}
