@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 
 test("home page loads the setup form", async ({ page }) => {
 	await page.goto("/")
-	await expect(page.locator("h1")).toHaveText("clockout")
+	await expect(page.locator("h1")).toHaveText("ClockOut")
 	await expect(
 		page.getByRole("button", { name: "Save and start tracking" }),
 	).toBeVisible()

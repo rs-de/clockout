@@ -102,6 +102,50 @@ small {
 	border-width: 0;
 }
 
+/* ── Loading ────────────────────────────────────────────── */
+
+.spinner {
+	display: inline-block;
+	width: 1.25em;
+	height: 1.25em;
+	border: 2px solid hsl(var(--primary-6));
+	border-top-color: hsl(var(--primary-9));
+	border-radius: 50%;
+	animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.loading-screen {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2rem;
+}
+
+.loading-screen .spinner {
+	width: 2em;
+	height: 2em;
+	border-width: 3px;
+}
+
+.sync-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	margin: 0;
+}
+
+.sync-status .spinner {
+	width: 1em;
+	height: 1em;
+	border-width: 2px;
+}
+
 /* ── App shell ──────────────────────────────────────────── */
 
 .app-root {
@@ -309,9 +353,17 @@ fieldset > .field-hint {
 }
 
 fieldset {
+	/* Safari/WebKit-only: an explicit inline-size and a literal 0 bottom
+	   padding (with a <legend> present) are both known triggers for a
+	   fieldset content-box recalculation on focus — width:100% avoids
+	   relying on flex-stretch's intrinsic sizing, and 0.01em (not 0) avoids
+	   the zero-padding quirk. Chrome/Firefox render this identically either
+	   way, so this is a defensive fix, not a visible change there. */
+	box-sizing: border-box;
+	width: 100%;
+	margin: 0;
 	border: var(--border-size-1) solid hsl(var(--slate-6));
 	border-radius: 0.5rem;
-	padding: 0.75rem 1rem 0;
 }
 
 legend {

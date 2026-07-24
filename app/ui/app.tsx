@@ -295,7 +295,12 @@ export const App = clientEntry(
 		}
 
 		return () => {
-			if (view.kind === "loading") return <p>Loading...</p>
+			if (view.kind === "loading")
+				return (
+					<div class="loading-screen" role="status" aria-label={t("Loading")}>
+						<div class="spinner" aria-hidden="true" />
+					</div>
+				)
 
 			if (view.kind === "unlock") {
 				const { id, error } = view
@@ -312,7 +317,7 @@ export const App = clientEntry(
 							)
 						})}
 					>
-						<h1>clockout</h1>
+						<h1>ClockOut</h1>
 						<p class="form-intro">
 							{t("This browser doesn't have local data for this link.")}
 						</p>
@@ -359,7 +364,7 @@ export const App = clientEntry(
 							void handleSetupSubmit(new FormData(event.currentTarget), id)
 						})}
 					>
-						<h1>clockout</h1>
+						<h1>ClockOut</h1>
 
 						<p class="form-intro">
 							{t(
@@ -491,7 +496,10 @@ export const App = clientEntry(
 						t={t}
 						footer={
 							syncStatusLabel(syncEngine.getStatus(), t) && (
-								<p role="status">
+								<p class="sync-status" role="status">
+									{syncEngine.getStatus() === "syncing" && (
+										<span class="spinner" aria-hidden="true" />
+									)}
 									{syncStatusLabel(syncEngine.getStatus(), t)}
 								</p>
 							)

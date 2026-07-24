@@ -20,6 +20,7 @@ export const de: Record<string, string> = {
 	Imprint: "Impressum",
 	"Lean, private time tracking that shows how much time is left today and this week.":
 		"Schlanke, private Zeiterfassung, die zeigt, wie viel Zeit heute und diese Woche noch bleibt.",
+	Loading: "Wird geladen",
 	"Lunch break": "Mittagspause",
 	"No data found for this link.": "Keine Daten für diesen Link gefunden.",
 	Password: "Passwort",
