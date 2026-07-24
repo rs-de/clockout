@@ -6,9 +6,10 @@
 	"scripts": {
 		"dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
 		"start": "NODE_ENV=production node --import remix/node-tsx server.ts",
-		"test": "pnpm test:unit && pnpm test:e2e",
+		"test": "pnpm test:unit && pnpm test:e2e && pnpm test:quality",
 		"test:unit": "NODE_ENV=test node --import remix/node-tsx --test",
 		"test:e2e": "playwright test",
+		"test:quality": "node --import remix/node-tsx scripts/lighthouse.ts",
 		"i18n:sync": "node --import remix/node-tsx scripts/i18n-sync.ts",
 		"i18n:check": "node --import remix/node-tsx scripts/i18n-sync.ts --check",
 		"typecheck": "tsc --noEmit",
@@ -30,6 +31,7 @@
 		"@playwright/test": "^1.61.1",
 		"@types/node": "26.1.1",
 		"fake-indexeddb": "^6.2.5",
+		"lighthouse": "^13.4.0",
 		"playwright": "^1.61.1",
 		"typescript": "7.0.2"
 	}

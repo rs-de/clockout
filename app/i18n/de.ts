@@ -50,6 +50,8 @@ export const de: Record<string, string> = {
 	"Week remaining: {duration}": "Verbleibend diese Woche: {duration}",
 	"Weekly target": "Wochenarbeitszeit",
 	"Wrong password.": "Falsches Passwort.",
+	"clockout is a lean, private time tracker: clock in, clock out, and see at a glance how much time is left today and this week. No account needed — your data is encrypted in your browser before it's synced, so only you can unlock it. Try one of the example scenarios below to see it in action.":
+		"clockout ist eine schlanke, private Zeiterfassung: einstempeln, ausstempeln und auf einen Blick sehen, wie viel Zeit heute und diese Woche noch bleibt. Kein Konto nötig — deine Daten werden im Browser verschlüsselt, bevor sie synchronisiert werden, sodass nur du sie entsperren kannst. Probiere unten eines der Beispiele aus, um sie in Aktion zu sehen.",
 	h: "h",
 	m: "min",
 }

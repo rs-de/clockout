@@ -12,9 +12,14 @@ export function AboutPage(handle: Handle<AboutPageProps>) {
 		const t = createTranslator(handle.props.lang ?? DEFAULT_LANG)
 
 		return (
-			<div>
+			<div class="about-page">
 				<h1>{t("About clockout")}</h1>
-				<ul>
+				<p class="about-intro">
+					{t(
+						"clockout is a lean, private time tracker: clock in, clock out, and see at a glance how much time is left today and this week. No account needed — your data is encrypted in your browser before it's synced, so only you can unlock it. Try one of the example scenarios below to see it in action.",
+					)}
+				</p>
+				<ul class="about-examples">
 					{EXAMPLES.map((example) => (
 						<li key={example.id}>
 							<a href={`/example/${example.id}`}>{t(example.title)}</a>

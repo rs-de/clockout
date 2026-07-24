@@ -421,16 +421,24 @@ export const App = clientEntry(
 									min="0"
 									max="168"
 									defaultValue="35"
+									aria-label={`${t("Weekly target")} ${t("h")}`}
+									mix={on("focus", (event) => event.currentTarget.select())}
 								/>
-								<span class="unit">{t("h")}</span>
+								<span class="unit" aria-hidden="true">
+									{t("h")}
+								</span>
 								<input
 									name="weeklyMinutes"
 									type="number"
 									min="0"
 									max="59"
 									defaultValue="0"
+									aria-label={`${t("Weekly target")} ${t("m")}`}
+									mix={on("focus", (event) => event.currentTarget.select())}
 								/>
-								<span class="unit">{t("m")}</span>
+								<span class="unit" aria-hidden="true">
+									{t("m")}
+								</span>
 							</div>
 							<p class="field-hint">
 								{t("Used to calculate how much time you have left this week.")}
@@ -446,16 +454,24 @@ export const App = clientEntry(
 									min="0"
 									max="23"
 									defaultValue="9"
+									aria-label={`${t("Daily max")} ${t("h")}`}
+									mix={on("focus", (event) => event.currentTarget.select())}
 								/>
-								<span class="unit">{t("h")}</span>
+								<span class="unit" aria-hidden="true">
+									{t("h")}
+								</span>
 								<input
 									name="dailyMinutes"
 									type="number"
 									min="0"
 									max="59"
 									defaultValue="55"
+									aria-label={`${t("Daily max")} ${t("m")}`}
+									mix={on("focus", (event) => event.currentTarget.select())}
 								/>
-								<span class="unit">{t("m")}</span>
+								<span class="unit" aria-hidden="true">
+									{t("m")}
+								</span>
 							</div>
 							<p class="field-hint">
 								{t("Used to calculate how much time you have left today.")}
@@ -522,7 +538,7 @@ export const App = clientEntry(
 					}
 					t={t}
 					banner={
-						<p role="status">
+						<p class="time-banner" role="status">
 							{t(
 								'Demo: simulating "{name}" — {dateTime}. Nothing here is saved.',
 								{ name: t(example.title), dateTime },
@@ -577,38 +593,48 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 					<li key={day.getTime()}>
 						<fieldset>
 							<legend>{label}</legend>
-							<input
-								name={`day-${i}-hours`}
-								type="number"
-								min="0"
-								max="23"
-								defaultValue="0"
-								disabled={isWeekend}
-							/>{" "}
-							{t("h")}
-							<input
-								name={`day-${i}-minutes`}
-								type="number"
-								min="0"
-								max="59"
-								defaultValue="0"
-								disabled={isWeekend}
-							/>{" "}
-							{t("m")}
-							<label>
+							<div class="hm-row">
 								<input
-									name={`day-${i}-skip`}
-									type="checkbox"
-									defaultChecked={isWeekend}
-									mix={on("change", (event) => {
-										toggleCatchupDayFields(
-											event.currentTarget.closest("fieldset"),
-											event.currentTarget.checked,
-										)
-									})}
-								/>{" "}
-								{t("Did not work")}
-							</label>
+									name={`day-${i}-hours`}
+									type="number"
+									min="0"
+									max="23"
+									defaultValue="0"
+									disabled={isWeekend}
+									aria-label={`${label} ${t("h")}`}
+									mix={on("focus", (event) => event.currentTarget.select())}
+								/>
+								<span class="unit" aria-hidden="true">
+									{t("h")}
+								</span>
+								<input
+									name={`day-${i}-minutes`}
+									type="number"
+									min="0"
+									max="59"
+									defaultValue="0"
+									disabled={isWeekend}
+									aria-label={`${label} ${t("m")}`}
+									mix={on("focus", (event) => event.currentTarget.select())}
+								/>
+								<span class="unit" aria-hidden="true">
+									{t("m")}
+								</span>
+								<label class="catchup-skip">
+									<input
+										name={`day-${i}-skip`}
+										type="checkbox"
+										defaultChecked={isWeekend}
+										mix={on("change", (event) => {
+											toggleCatchupDayFields(
+												event.currentTarget.closest("fieldset"),
+												event.currentTarget.checked,
+											)
+										})}
+									/>
+									{t("Did not work")}
+								</label>
+							</div>
 						</fieldset>
 					</li>
 				)
@@ -616,48 +642,30 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 		)
 
 		return (
-			<div>
+			<div class="time-page">
 				{banner}
-				<p>
-					{t("Week remaining: {duration}", {
-						duration: formatDuration(summary.weeklyRemainingSec),
-					})}
-				</p>
-				<p>
-					{t("Day remaining: {duration}", {
-						duration: formatDuration(summary.dailyRemainingSec),
-					})}
-				</p>
-				{summary.startedAt !== null && (
-					<p>
-						{t("Started at {time}", {
-							time: formatClockTime(
-								new Date(summary.startedAt * 1000),
-								data.settings.dateFormat,
-							),
+				<div class="time-stats">
+					<p class="time-stat time-stat--day">
+						{t("Day remaining: {duration}", {
+							duration: formatDuration(summary.dailyRemainingSec),
 						})}
 					</p>
-				)}
-				{entryDays.length > 0 ? (
-					<form
-						mix={on("submit", (event) => {
-							event.preventDefault()
-							onCatchupSubmit(entryDays, new FormData(event.currentTarget))
+					<p class="time-stat time-stat--week">
+						{t("Week remaining: {duration}", {
+							duration: formatDuration(summary.weeklyRemainingSec),
 						})}
-					>
-						<p>
-							{t(
-								'Some days this week have no tracked hours yet. Enter how many hours you worked, or check "Did not work".',
-							)}
+					</p>
+					{summary.startedAt !== null && (
+						<p class="time-started">
+							{t("Started at {time}", {
+								time: formatClockTime(
+									new Date(summary.startedAt * 1000),
+									data.settings.dateFormat,
+								),
+							})}
 						</p>
-						<ul>{weekList}</ul>
-						<button type="submit" class="btn btn-primary">
-							{t("Save hours")}
-						</button>
-					</form>
-				) : (
-					<ul>{weekList}</ul>
-				)}
+					)}
+				</div>
 				{
 					// A dangling start from an earlier day (not today) has nothing
 					// live to "stop" — closing it here would just slap a "stop" on
@@ -676,6 +684,27 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 						</button>
 					)
 				}
+				{entryDays.length > 0 ? (
+					<form
+						class="catchup-form"
+						mix={on("submit", (event) => {
+							event.preventDefault()
+							onCatchupSubmit(entryDays, new FormData(event.currentTarget))
+						})}
+					>
+						<p class="form-intro">
+							{t(
+								'Some days this week have no tracked hours yet. Enter how many hours you worked, or check "Did not work".',
+							)}
+						</p>
+						<ul class="week-list">{weekList}</ul>
+						<button type="submit" class="btn btn-primary">
+							{t("Save hours")}
+						</button>
+					</form>
+				) : (
+					<ul class="week-list">{weekList}</ul>
+				)}
 				{footer}
 			</div>
 		)

@@ -167,3 +167,24 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 54. Extend Open Props coverage: font-weight/line-height/z-index/font-sans
     `(add fonts.min.css/zindex.min.css imports; skip risky --font-mono swap)`
+
+55. Style the about page and add an intro paragraph explaining clockout
+    `(edit about.tsx/app.css/de.ts: intro copy + card-style example list)`
+
+56. Style the tracking screen; make Start/Stop and Save hours prominent
+    `(edit app.tsx/app.css: stat card, full-width toggle button, week-list)`
+
+57. Fix catch-up row spacing (hm-row/unit + labeled skip checkbox in-row)
+    `(edit app.tsx/app.css: reuse hm-row/unit, add .catchup-skip)`
+
+58. Add Lighthouse quality gate (perf>=80, a11y/bp/seo>=90) across pages
+    `(pnpm add -D lighthouse; add scripts/lighthouse.ts; wire test:quality)`
+
+59. Fix missing input labels found by the new a11y gate (home page 94->100)
+    `(edit app.tsx: aria-label on weekly/daily/catch-up hour+minute inputs)`
+
+60. Select number-input value on focus so keyboard entry overwrites it
+    `(edit app.tsx: mix={on("focus", ...select())} on all h/m inputs)`
+
+61. Stop @import-chaining Open Props CSS; link all 6 files in parallel
+    `(edit app.css/document.tsx: 5 <link> tags before app.css, same order)`

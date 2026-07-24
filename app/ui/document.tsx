@@ -14,6 +14,16 @@ export interface DocumentProps {
 
 const DEFAULT_TITLE = readAppDisplayName("Clockout")
 
+// Order matches the app.css tokens that depend on them (border-size,
+// spacing, duration, font, z-index) — see the comment above their <link> use.
+const OPEN_PROPS_FILES = [
+	"borders.min.css",
+	"sizes.min.css",
+	"durations.min.css",
+	"fonts.min.css",
+	"zindex.min.css",
+] as const
+
 // iOS only synthesizes a splash screen from these explicit, per-device media
 // queries — omitting them shows a blank screen on launch instead of the app
 // icon. Same image for both color schemes, so no prefers-color-scheme clause
@@ -73,6 +83,18 @@ export function Document(handle: Handle<DocumentProps>) {
 					<meta name="apple-mobile-web-app-capable" content="yes" />
 					{APPLE_SPLASH_SCREENS.map(({ href, media }) => (
 						<link rel="apple-touch-startup-image" href={href} media={media} />
+					))}
+					{/* Linked directly (not @import'd from app.css) so the browser
+					discovers and fetches all five in parallel from the initial HTML
+					instead of serially after fetching+parsing app.css first. Order
+					matters: these must precede app.css so its :root can override them. */}
+					{OPEN_PROPS_FILES.map((path) => (
+						<link
+							rel="stylesheet"
+							href={routes.assets.href({
+								path: `node_modules/open-props/${path}`,
+							})}
+						/>
 					))}
 					<link
 						rel="stylesheet"
