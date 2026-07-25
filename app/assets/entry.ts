@@ -142,7 +142,13 @@ interface BeforeInstallPromptEvent extends Event {
 	prompt(): Promise<void>
 }
 
-if (!localStorage.getItem("co-install-prompted")) {
+// Only on an actual tracked document (/d/:id) — the setup/unlock forms
+// navigate away for real now (see handleSetupSubmit/handleUnlockSubmit in
+// app.tsx), so a banner shown there gets torn down before it's ever
+// noticed. Nothing worth installing exists before that point anyway.
+const hasDocument = /^\/d\//.test(window.location.pathname)
+
+if (hasDocument && !localStorage.getItem("co-install-prompted")) {
 	const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
 	const isStandalone =
 		(navigator as Navigator & { standalone?: boolean }).standalone === true ||
