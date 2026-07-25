@@ -196,7 +196,10 @@ small {
 /* ── App shell ──────────────────────────────────────────── */
 
 .app-root {
-	min-height: 100vh;
+	/* dvh (not vh) accounts for mobile browser chrome / the standalone PWA
+	   safe area — 100vh alone can exceed the real visible viewport there,
+	   stretching this column tall enough to push the footer out of view. */
+	min-height: 100dvh;
 	display: flex;
 	flex-direction: column;
 	justify-content: space-between;

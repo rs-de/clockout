@@ -57,6 +57,9 @@ type View =
 	// landing page, not the tracking screen — it only links to the
 	// bookmarkable /d/:id, which is where "tracking" actually renders.
 	| { kind: "home"; data: TrackingData }
+	// Editing the global weekly target / daily max / date format for an
+	// existing doc — reached from "home", returns there on save or cancel.
+	| { kind: "settings"; data: TrackingData }
 	| { kind: "tracking"; data: TrackingData }
 	// In-memory only — see app/utils/examples.ts. `offsetMs` is the fixed
 	// gap between the example's pretend "now" and the real clock, captured
@@ -349,6 +352,21 @@ export const App = clientEntry(
 			window.location.reload()
 		}
 
+		async function handleSettingsSubmit(
+			data: TrackingData,
+			formData: FormData,
+		) {
+			data.settings = {
+				weeklyTargetMin: readMinutes(formData, "weeklyHours", "weeklyMinutes"),
+				dailyMax: readMinutes(formData, "dailyHours", "dailyMinutes"),
+				dateFormat: (formData.get("dateFormat") as DateFormat | null) ?? "de",
+			}
+			await saveTrackingData(data)
+			view = { kind: "home", data }
+			handle.update()
+			if (sessionKey) void syncEngine.sync(data, sessionKey)
+		}
+
 		async function handleCatchupSubmit(
 			data: TrackingData,
 			days: Date[],
@@ -563,6 +581,7 @@ export const App = clientEntry(
 								<input
 									name="weeklyHours"
 									type="number"
+									inputmode="numeric"
 									min="0"
 									max="168"
 									defaultValue="35"
@@ -580,6 +599,7 @@ export const App = clientEntry(
 								<input
 									name="weeklyMinutes"
 									type="number"
+									inputmode="numeric"
 									min="0"
 									max="59"
 									defaultValue="0"
@@ -606,6 +626,7 @@ export const App = clientEntry(
 								<input
 									name="dailyHours"
 									type="number"
+									inputmode="numeric"
 									min="0"
 									max="23"
 									defaultValue="9"
@@ -623,6 +644,7 @@ export const App = clientEntry(
 								<input
 									name="dailyMinutes"
 									type="number"
+									inputmode="numeric"
 									min="0"
 									max="59"
 									defaultValue="55"
@@ -669,13 +691,161 @@ export const App = clientEntry(
 				return (
 					<div class="form-card">
 						<h1>ClockOut</h1>
-						<p class="form-intro">
-							{t("You already have a ClockOut on this device.")}
-						</p>
 						<a href={`/d/${data.id}`} class="btn btn-primary">
 							{t("Go to your time tracking")}
 						</a>
+						<button
+							type="button"
+							class="btn"
+							mix={on("click", () => {
+								view = { kind: "settings", data }
+								handle.update()
+							})}
+						>
+							{t("Settings")}
+						</button>
 					</div>
+				)
+			}
+
+			if (view.kind === "settings") {
+				const { data } = view
+				const weeklyHours = Math.floor(data.settings.weeklyTargetMin / 60)
+				const weeklyMinutes = data.settings.weeklyTargetMin % 60
+				const dailyHours = Math.floor(data.settings.dailyMax / 60)
+				const dailyMinutes = data.settings.dailyMax % 60
+
+				return (
+					<form
+						class="form-card"
+						mix={on("submit", (event) => {
+							event.preventDefault()
+							void handleSettingsSubmit(data, new FormData(event.currentTarget))
+						})}
+					>
+						<h1>{t("Settings")}</h1>
+
+						<fieldset>
+							<legend>{t("Weekly target")}</legend>
+							<div class="hm-row">
+								<input
+									name="weeklyHours"
+									type="number"
+									inputmode="numeric"
+									min="0"
+									max="168"
+									defaultValue={String(weeklyHours)}
+									aria-label={`${t("Weekly target")} ${t("h")}`}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
+								/>
+								<span class="unit" aria-hidden="true">
+									{t("h")}
+								</span>
+								<input
+									name="weeklyMinutes"
+									type="number"
+									inputmode="numeric"
+									min="0"
+									max="59"
+									defaultValue={String(weeklyMinutes)}
+									aria-label={`${t("Weekly target")} ${t("m")}`}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
+								/>
+								<span class="unit" aria-hidden="true">
+									{t("m")}
+								</span>
+							</div>
+							<p class="field-hint">
+								{t("Used to calculate how much time you have left this week.")}
+							</p>
+						</fieldset>
+
+						<fieldset>
+							<legend>{t("Daily max")}</legend>
+							<div class="hm-row">
+								<input
+									name="dailyHours"
+									type="number"
+									inputmode="numeric"
+									min="0"
+									max="23"
+									defaultValue={String(dailyHours)}
+									aria-label={`${t("Daily max")} ${t("h")}`}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
+								/>
+								<span class="unit" aria-hidden="true">
+									{t("h")}
+								</span>
+								<input
+									name="dailyMinutes"
+									type="number"
+									inputmode="numeric"
+									min="0"
+									max="59"
+									defaultValue={String(dailyMinutes)}
+									aria-label={`${t("Daily max")} ${t("m")}`}
+									mix={[
+										on("focus", (event) => selectOnFocus(event.currentTarget)),
+										on("mouseup", (event) =>
+											reassertSelectOnMouseUp(event.currentTarget, event),
+										),
+									]}
+								/>
+								<span class="unit" aria-hidden="true">
+									{t("m")}
+								</span>
+							</div>
+							<p class="field-hint">
+								{t("Used to calculate how much time you have left today.")}
+							</p>
+						</fieldset>
+
+						<div class="form-field">
+							<label class="form-field">
+								{t("Date format")}
+								<select
+									name="dateFormat"
+									defaultValue={data.settings.dateFormat ?? "de"}
+								>
+									<option value="de">{t("German (17.07.2026, 24h)")}</option>
+									<option value="iso">{t("ISO 8601 (2026-07-17, 24h)")}</option>
+									<option value="auto">{t("Browser default")}</option>
+								</select>
+							</label>
+							<p class="field-hint">
+								{t("How dates and times are displayed throughout the app.")}
+							</p>
+						</div>
+
+						<button type="submit" class="btn btn-primary">
+							{t("Save")}
+						</button>
+						<button
+							type="button"
+							class="btn"
+							mix={on("click", () => {
+								view = { kind: "home", data }
+								handle.update()
+							})}
+						>
+							{t("Cancel")}
+						</button>
+					</form>
 				)
 			}
 
@@ -795,6 +965,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 										form={EDIT_DAY_FORM_ID}
 										name="hours"
 										type="number"
+										inputmode="numeric"
 										min="0"
 										max="23"
 										defaultValue={String(hours)}
@@ -831,6 +1002,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 										form={EDIT_DAY_FORM_ID}
 										name="minutes"
 										type="number"
+										inputmode="numeric"
 										min="0"
 										max="59"
 										defaultValue={String(minutes)}
@@ -924,6 +1096,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 								<input
 									name={`day-${i}-hours`}
 									type="number"
+									inputmode="numeric"
 									min="0"
 									max="23"
 									defaultValue="0"
@@ -942,6 +1115,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 								<input
 									name={`day-${i}-minutes`}
 									type="number"
+									inputmode="numeric"
 									min="0"
 									max="59"
 									defaultValue="0"

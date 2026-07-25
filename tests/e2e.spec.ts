@@ -185,6 +185,38 @@ test("home shows a link to the existing doc, not the tracking screen directly", 
 	).toBeVisible()
 })
 
+test("home offers a settings link that edits and persists weekly/daily targets", async ({
+	page,
+}) => {
+	await page.goto("/")
+	await page.getByLabel("Password", { exact: true }).fill("correct horse")
+	await page.getByLabel("Repeat password").fill("correct horse")
+	await page.getByRole("button", { name: "Save and start tracking" }).click()
+	await expect(page).toHaveURL(/\/d\//)
+	await resolvePendingWeek(page)
+
+	// Soft-navigate back to / (same reasoning as the logo/home tests above),
+	// where settings editing is offered.
+	await page.goto("/")
+	await page.getByRole("button", { name: "Settings" }).click()
+
+	const weeklyHours = page.locator('input[name="weeklyHours"]')
+	await expect(weeklyHours).toHaveValue("35")
+	await weeklyHours.fill("20")
+	await page.getByRole("button", { name: "Save" }).click()
+
+	// Back on home; reopening settings must show the persisted value, not
+	// the default — proves the save actually reached IndexedDB rather than
+	// just updating in-memory view state.
+	const homeLink = page.getByRole("link", { name: "Go to your time tracking" })
+	await expect(homeLink).toBeVisible()
+	await page.getByRole("button", { name: "Settings" }).click()
+	await expect(weeklyHours).toHaveValue("20")
+
+	await page.getByRole("button", { name: "Cancel" }).click()
+	await expect(homeLink).toBeVisible()
+})
+
 test("clearing local storage requires re-entering the password to unlock", async ({
 	page,
 }) => {

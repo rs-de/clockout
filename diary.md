@@ -242,3 +242,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 79. Backfill is fully data-driven; hide Start/Stop until week is answered
     `(edit time-tracking.ts/app.tsx/*.test.ts/e2e.spec.ts: guard + toggle gate)`
+
+80. Settings screen from home; fix PWA 100vh layout bug; numeric keypad
+    `(edit app.tsx/app.css/de.ts/e2e.spec.ts: settings view, dvh, inputmode)`
