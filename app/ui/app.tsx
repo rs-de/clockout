@@ -155,6 +155,27 @@ function syncPasswordMatchValidity(
 	)
 }
 
+// Explicitly asks Chrome-family browsers to offer saving this password,
+// instead of leaning on their heuristics for a form that never navigates
+// (see handleSetupSubmit/handleUnlockSubmit, which do navigate now, but
+// this is the more reliable signal where it's supported). Safari doesn't
+// implement PasswordCredential at all, so this is a no-op there —
+// feature-detected and best-effort, never throws.
+async function storePasswordCredential(id: string, password: string) {
+	if (typeof PasswordCredential === "undefined") return
+	try {
+		await navigator.credentials.store(
+			new PasswordCredential({ id, password, name: id }),
+		)
+	} catch {
+		// Ignored — e.g. the user already declined once for this id.
+	}
+}
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 // Safari/WebKit-only: focusing a number input by click still lets the native
 // mouseup that follows place the caret at the click position afterward,
 // silently collapsing the selection `.select()` just made on focus (Tab
@@ -254,6 +275,7 @@ export const App = clientEntry(
 		}
 
 		async function handleSetupSubmit(formData: FormData, id: string) {
+			const password = String(formData.get("password") ?? "")
 			const data = createTrackingData(
 				{
 					weeklyTargetMin: readMinutes(
@@ -267,16 +289,30 @@ export const App = clientEntry(
 				id,
 			)
 			await saveTrackingData(data)
-			sessionKey = await deriveTrackingKey(
-				String(formData.get("password") ?? ""),
-			)
+			sessionKey = await deriveTrackingKey(password)
 			await saveSyncKey(sessionKey)
-			view = { kind: "tracking", data }
+
+			// Show progress instead of a frozen form while the first sync push
+			// and the password-manager prompt (both below) are awaited.
+			view = { kind: "loading" }
 			handle.update()
-			// Makes the URL bookmarkable so it can be used to recover this
-			// document later if local storage gets cleared.
-			window.history.replaceState(null, "", `/d/${data.id}`)
-			syncEngine.sync(data, sessionKey)
+
+			await Promise.all([
+				// Bounded: a real navigation kills any pending fetch anyway once
+				// we leave, so don't let a hung request hold up setup
+				// indefinitely. If the push hasn't landed by then, the next
+				// Start/Stop toggle (or catch-up edit) retries it the same as
+				// any other interrupted sync.
+				Promise.race([syncEngine.sync(data, sessionKey), delay(2000)]),
+				storePasswordCredential(data.id, password),
+			])
+
+			// Real navigation (not history.replaceState + in-place view swap)
+			// so Safari/Chrome recognize this as a completed form submission
+			// and offer to save the password — safe because saveSyncKey()
+			// above already persisted what resolveView() needs to rehydrate
+			// straight into the tracking view on the next load, no re-prompt.
+			window.location.assign(`/d/${data.id}`)
 		}
 
 		async function handleUnlockSubmit(id: string, unlockPassword: string) {
@@ -294,12 +330,17 @@ export const App = clientEntry(
 				const data = await decryptTrackingData(doc, syncKey)
 				await saveTrackingData(data)
 				await saveSyncKey(syncKey)
-				sessionKey = syncKey
-				view = { kind: "tracking", data }
 			} catch {
 				view = { kind: "unlock", id, error: t("Wrong password.") }
+				handle.update()
+				return
 			}
-			handle.update()
+
+			// Real navigation, same reasoning as handleSetupSubmit above — safe
+			// here too since saveSyncKey() already persisted what resolveView()
+			// needs to rehydrate straight back into the tracking view.
+			await storePasswordCredential(id, unlockPassword)
+			window.location.reload()
 		}
 
 		async function handleCatchupSubmit(
@@ -319,14 +360,14 @@ export const App = clientEntry(
 			)
 			await saveTrackingData(data)
 			handle.update()
-			if (sessionKey) syncEngine.sync(data, sessionKey)
+			if (sessionKey) void syncEngine.sync(data, sessionKey)
 		}
 
 		async function handleToggle(data: TrackingData) {
 			data.events = toggleTracking(data.events, Math.floor(Date.now() / 1000))
 			await saveTrackingData(data)
 			handle.update()
-			if (sessionKey) syncEngine.sync(data, sessionKey)
+			if (sessionKey) void syncEngine.sync(data, sessionKey)
 		}
 
 		async function handleEditDay(
@@ -338,7 +379,7 @@ export const App = clientEntry(
 			data.events = editDay(data.events, day, minutes, currentWorkedSec)
 			await saveTrackingData(data)
 			handle.update()
-			if (sessionKey) syncEngine.sync(data, sessionKey)
+			if (sessionKey) void syncEngine.sync(data, sessionKey)
 		}
 
 		// Example handlers mirror the real ones above but stay in-memory only —

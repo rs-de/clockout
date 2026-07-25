@@ -221,3 +221,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 72. Reword full history to Conventional Commits; add a skill to keep it so
     `(filter-branch --msg-filter reword.sh -- main; add conventional-commits skill)`
+
+73. Real navigation on setup/unlock + Credential Management API for save-password
+    `(edit app.tsx/sync-engine.ts: navigate post-sync; add password-credential.d.ts)`

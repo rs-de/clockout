@@ -167,12 +167,11 @@ test("clearing local storage requires re-entering the password to unlock", async
 	await page.getByLabel("Password", { exact: true }).fill("correct horse")
 	await page.getByLabel("Repeat password").fill("correct horse")
 	await page.getByRole("button", { name: "Save and start tracking" }).click()
+	// Setup awaits its first sync push (or a 2s cap) before navigating, so by
+	// the time the URL below actually changes, the server already has an
+	// encrypted copy to unlock against.
 	await expect(page).toHaveURL(/\/d\//)
 	const docUrl = page.url()
-
-	// Setup fires off the first sync itself — wait for it so the server
-	// actually has an encrypted copy to unlock against below.
-	await expect(page.getByRole("status")).toHaveText("Synced")
 
 	// Simulate a fresh browser / cleared cache: wipe the IndexedDB the sync
 	// key and plaintext copy live in, then revisit the bookmarkable doc URL.

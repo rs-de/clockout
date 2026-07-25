@@ -17,8 +17,13 @@ export type SyncEngine = {
 	 * bursts coalesce to the latest state: a new call aborts whichever
 	 * request is still in flight, and a response is only trusted as "synced"
 	 * if no newer call has superseded it since.
+	 *
+	 * Returns a promise that resolves once this attempt settles (success,
+	 * failure, or superseded) — most callers fire-and-forget it same as
+	 * before, but setup awaits it once to know the first push landed before
+	 * navigating away. Never rejects: failures are handled internally.
 	 */
-	sync(data: TrackingData, syncKey: TrackingSyncKey): void
+	sync(data: TrackingData, syncKey: TrackingSyncKey): Promise<void>
 	/** Wires the online-triggered retry. Call once; torn down via `signal`. */
 	init(signal: AbortSignal): void
 }
@@ -91,7 +96,7 @@ export function createSyncEngine(onUpdate: () => void): SyncEngine {
 	return {
 		getStatus: () => status,
 		sync(data, syncKey) {
-			void run(data, syncKey)
+			return run(data, syncKey)
 		},
 		init(signal) {
 			engineSignal = signal
