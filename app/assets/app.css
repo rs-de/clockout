@@ -610,6 +610,13 @@ select:disabled {
 	line-height: var(--font-lineheight-3);
 }
 
+.about-examples-heading {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: var(--font-weight-7);
+	color: hsl(var(--slate-12));
+}
+
 .about-examples {
 	display: flex;
 	flex-direction: column;

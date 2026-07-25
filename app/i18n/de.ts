@@ -12,6 +12,7 @@ export const de: Record<string, string> = {
 		'Demo: Simulation von "{name}" — {dateTime}. Hier wird nichts gespeichert.',
 	"Did not work": "Nicht gearbeitet",
 	Edit: "Bearbeiten",
+	Examples: "Beispiele",
 	"Forgot to stop": "Zu stoppen vergessen",
 	"Forgot to stop on Friday": "Am Freitag zu stoppen vergessen",
 	"German (17.07.2026, 24h)": "Deutsch (17.07.2026, 24h)",

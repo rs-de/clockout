@@ -24,7 +24,46 @@ export type Example = {
 	events: RelativeEvent[]
 }
 
+// Ordered from the most ordinary case to the most edge-case-y, since this
+// is also the order the About page lists them in — a first-time visitor
+// should see what normal, everyday use looks like before the recovery/edge
+// cases most people won't hit often.
 export const EXAMPLES: Example[] = [
+	{
+		id: "steady-week",
+		title: "A steady week",
+		description: "Four completed days, and Friday afternoon almost done.",
+		pretendWeekday: 4, // Friday
+		pretendTime: "16:00",
+		events: [
+			{ daysAgo: 4, time: "09:00", type: "start" },
+			{ daysAgo: 4, time: "17:00", type: "stop" },
+			{ daysAgo: 3, time: "09:00", type: "start" },
+			{ daysAgo: 3, time: "17:00", type: "stop" },
+			{ daysAgo: 2, time: "09:00", type: "start" },
+			{ daysAgo: 2, time: "17:00", type: "stop" },
+			{ daysAgo: 1, time: "09:00", type: "start" },
+			{ daysAgo: 1, time: "17:00", type: "stop" },
+			{ daysAgo: 0, time: "13:00", type: "start" },
+		],
+	},
+	{
+		id: "lunch-break",
+		title: "Lunch break",
+		description:
+			"Stopped for lunch and restarted — the shown start time stays pinned to the morning.",
+		pretendWeekday: 2, // Wednesday
+		pretendTime: "15:00",
+		events: [
+			{ daysAgo: 2, time: "09:00", type: "start" }, // Monday, 8h
+			{ daysAgo: 2, time: "17:00", type: "stop" },
+			{ daysAgo: 1, time: "09:00", type: "start" }, // Tuesday, 8h
+			{ daysAgo: 1, time: "17:00", type: "stop" },
+			{ daysAgo: 0, time: "09:00", type: "start" },
+			{ daysAgo: 0, time: "12:00", type: "stop" },
+			{ daysAgo: 0, time: "13:00", type: "start" },
+		],
+	},
 	{
 		id: "forgot-stop",
 		title: "Forgot to stop",
@@ -47,41 +86,6 @@ export const EXAMPLES: Example[] = [
 		pretendTime: "08:30",
 		events: [
 			{ daysAgo: 3, time: "09:00", type: "start" }, // Friday last week, never stopped
-		],
-	},
-	{
-		id: "lunch-break",
-		title: "Lunch break",
-		description:
-			"Stopped for lunch and restarted — the shown start time stays pinned to the morning.",
-		pretendWeekday: 2, // Wednesday
-		pretendTime: "15:00",
-		events: [
-			{ daysAgo: 2, time: "09:00", type: "start" }, // Monday, 8h
-			{ daysAgo: 2, time: "17:00", type: "stop" },
-			{ daysAgo: 1, time: "09:00", type: "start" }, // Tuesday, 8h
-			{ daysAgo: 1, time: "17:00", type: "stop" },
-			{ daysAgo: 0, time: "09:00", type: "start" },
-			{ daysAgo: 0, time: "12:00", type: "stop" },
-			{ daysAgo: 0, time: "13:00", type: "start" },
-		],
-	},
-	{
-		id: "steady-week",
-		title: "A steady week",
-		description: "Four completed days, and Friday afternoon almost done.",
-		pretendWeekday: 4, // Friday
-		pretendTime: "16:00",
-		events: [
-			{ daysAgo: 4, time: "09:00", type: "start" },
-			{ daysAgo: 4, time: "17:00", type: "stop" },
-			{ daysAgo: 3, time: "09:00", type: "start" },
-			{ daysAgo: 3, time: "17:00", type: "stop" },
-			{ daysAgo: 2, time: "09:00", type: "start" },
-			{ daysAgo: 2, time: "17:00", type: "stop" },
-			{ daysAgo: 1, time: "09:00", type: "start" },
-			{ daysAgo: 1, time: "17:00", type: "stop" },
-			{ daysAgo: 0, time: "13:00", type: "start" },
 		],
 	},
 ]
