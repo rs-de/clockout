@@ -218,3 +218,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 71. SW: never intercept .map requests — real root cause of lingering errors
     `(edit sw.ts: return early on url.pathname.endsWith(".map"))`
+
+72. Reword full history to Conventional Commits; add a skill to keep it so
+    `(filter-branch --msg-filter reword.sh -- main; add conventional-commits skill)`

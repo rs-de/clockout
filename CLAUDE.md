@@ -8,7 +8,7 @@ Every change to this project follows a discuss-then-commit loop:
 2. **Discuss** — wait for the user to approve, tweak, or reject the step.
 3. **Execute** — once approved, apply the change.
 4. **Log** — append the two-line entry to `diary.md` (unless the user says "without diary").
-5. **Commit** — stage only the relevant files and commit. Always ask the user before committing unless they explicitly said "do it" or "yes" to the full step. Never add `Co-Authored-By` lines to commit messages.
+5. **Commit** — stage only the relevant files and commit. Always ask the user before committing unless they explicitly said "do it" or "yes" to the full step. Commit messages follow Conventional Commits (see the `conventional-commits` skill) — never add `Co-Authored-By` lines.
 
 ### diary.md format
 
