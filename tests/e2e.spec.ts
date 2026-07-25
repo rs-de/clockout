@@ -71,3 +71,42 @@ test("a stale dangling start hides the toggle until catch-up is resolved", async
 
 	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
 })
+
+test("editing an already-recorded day updates its total and the week's remaining time", async ({
+	page,
+}) => {
+	await page.goto("/example/steady-week")
+
+	const weekRemaining = page.getByText(/Week remaining:/)
+	const weekRemainingBefore = await weekRemaining.textContent()
+
+	// aria-label carries the day's date, which shifts week to week — match
+	// on the stable prefix instead of the full label.
+	await page.locator('[aria-label^="Edit "]').first().click()
+
+	const hours = page.locator('input[name="hours"]')
+	await expect(hours).toBeFocused()
+
+	// Real keystrokes on top of the pre-filled default (8), not .fill() —
+	// this is what actually exercises select-on-focus. Typing "6" must
+	// *replace* the "8", not append to it (a prior bug typed "3" onto an
+	// unselected "8" and got "38").
+	await expect(hours).toHaveValue("8")
+	await page.keyboard.type("6")
+	await expect(hours).toHaveValue("6")
+	await page.locator('input[name="minutes"]').fill("0")
+	// The save button is a real submit bound to this row's form via the
+	// `form` attribute — Enter in either field submits it natively, no
+	// explicit click needed.
+	await page.keyboard.press("Enter")
+
+	await expect(page.locator(".week-list li").first()).toContainText("6h 00m")
+	// Back to the read-only row: the edit control reappears, the save
+	// button (and its inputs) are gone.
+	await expect(page.locator('[aria-label^="Edit "]').first()).toBeVisible()
+	await expect(hours).toHaveCount(0)
+	// The freed-up 2 hours (8h -> 6h) must show up in the week's remaining
+	// time automatically — this is the whole point of the event-sourced
+	// "adjust" delta, not a value the UI computes and pushes separately.
+	await expect(weekRemaining).not.toHaveText(weekRemainingBefore ?? "")
+})

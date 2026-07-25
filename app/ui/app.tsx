@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid"
-import { clientEntry, type Handle, on, type RemixNode } from "remix/ui"
+import { clientEntry, type Handle, on, type RemixNode, ref } from "remix/ui"
 
 import {
 	formatClockTime,
@@ -28,6 +28,7 @@ import { createSyncEngine, type SyncStatus } from "../utils/sync-engine.ts"
 import {
 	createTrackingData,
 	type DateFormat,
+	editDay,
 	formatDuration,
 	resolveCatchup,
 	startOfDay,
@@ -287,6 +288,18 @@ export const App = clientEntry(
 			if (sessionKey) syncEngine.sync(data, sessionKey)
 		}
 
+		async function handleEditDay(
+			data: TrackingData,
+			day: Date,
+			minutes: number,
+			currentWorkedSec: number,
+		) {
+			data.events = editDay(data.events, day, minutes, currentWorkedSec)
+			await saveTrackingData(data)
+			handle.update()
+			if (sessionKey) syncEngine.sync(data, sessionKey)
+		}
+
 		// Example handlers mirror the real ones above but stay in-memory only —
 		// no saveTrackingData, no syncToServer — since example data is strictly
 		// throwaway (see app/utils/examples.ts).
@@ -313,6 +326,16 @@ export const App = clientEntry(
 				workedMinutesPerDay,
 				skipDayFlags,
 			)
+			handle.update()
+		}
+
+		function handleExampleEditDay(
+			data: TrackingData,
+			day: Date,
+			minutes: number,
+			currentWorkedSec: number,
+		) {
+			data.events = editDay(data.events, day, minutes, currentWorkedSec)
 			handle.update()
 		}
 
@@ -551,6 +574,9 @@ export const App = clientEntry(
 						onCatchupSubmit={(days, formData) =>
 							void handleCatchupSubmit(data, days, formData)
 						}
+						onEditDay={(day, minutes, currentWorkedSec) =>
+							void handleEditDay(data, day, minutes, currentWorkedSec)
+						}
 						t={t}
 						footer={
 							syncStatusLabel(syncEngine.getStatus(), t) && (
@@ -578,6 +604,9 @@ export const App = clientEntry(
 					onCatchupSubmit={(days, formData) =>
 						handleExampleCatchupSubmit(data, days, formData)
 					}
+					onEditDay={(day, minutes, currentWorkedSec) =>
+						handleExampleEditDay(data, day, minutes, currentWorkedSec)
+					}
 					t={t}
 					banner={
 						<p class="time-banner" role="status">
@@ -599,15 +628,31 @@ type TrackingScreenProps = {
 	now: Date
 	onToggle: () => void
 	onCatchupSubmit: (days: Date[], formData: FormData) => void
+	onEditDay: (day: Date, minutes: number, currentWorkedSec: number) => void
 	t: Translator
 	banner?: RemixNode
 	footer?: RemixNode
 }
 
+const EDIT_DAY_FORM_ID = "edit-day-form"
+
 function TrackingScreen(handle: Handle<TrackingScreenProps>) {
+	// Which day's row (by day.getTime()) is currently showing its inline
+	// edit form, if any. Local UI state, not app data — reset once a save
+	// (or a submit for a *different* day) goes through.
+	let editingDayTime: number | null = null
+
 	return () => {
-		const { data, now, onToggle, onCatchupSubmit, t, banner, footer } =
-			handle.props
+		const {
+			data,
+			now,
+			onToggle,
+			onCatchupSubmit,
+			onEditDay,
+			t,
+			banner,
+			footer,
+		} = handle.props
 		const entryDays = weeklyEntryDays(data.events, now)
 		const entryDayIndex = new Map(entryDays.map((day, i) => [day.getTime(), i]))
 		const summary = summarize(data, now)
@@ -620,14 +665,132 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 				const i = entryDayIndex.get(day.getTime())
 
 				if (i === undefined) {
+					const isToday = day.getTime() === today
+
+					if (editingDayTime === day.getTime()) {
+						const totalMinutes = Math.round(workedSec / 60)
+						const hours = Math.floor(totalMinutes / 60)
+						const minutes = totalMinutes % 60
+
+						return (
+							<li key={day.getTime()} className="data-row data-row--editing">
+								<span class="edit-day-label">{label}</span>
+								<div class="hm-row">
+									<input
+										form={EDIT_DAY_FORM_ID}
+										name="hours"
+										type="number"
+										min="0"
+										max="23"
+										defaultValue={String(hours)}
+										aria-label={`${label} ${t("h")}`}
+										mix={[
+											// The native `autofocus` attribute isn't reliably
+											// honored for elements inserted after page load
+											// (Safari in particular) — `ref` fires on real DOM
+											// insertion instead, so this consistently focuses
+											// the field the moment edit mode opens, raising the
+											// mobile keyboard immediately. Calls selectOnFocus
+											// directly rather than relying on the "focus" mixin
+											// below to catch this: that listener isn't attached
+											// yet at the instant .focus() synchronously fires
+											// the native focus event, so the very first,
+											// programmatic focus would otherwise dispatch with
+											// no listener present to select the value.
+											ref((node) => {
+												node.focus()
+												selectOnFocus(node)
+											}),
+											on("focus", (event) =>
+												selectOnFocus(event.currentTarget),
+											),
+											on("mouseup", (event) =>
+												reassertSelectOnMouseUp(event.currentTarget, event),
+											),
+										]}
+									/>
+									<span class="unit" aria-hidden="true">
+										{t("h")}
+									</span>
+									<input
+										form={EDIT_DAY_FORM_ID}
+										name="minutes"
+										type="number"
+										min="0"
+										max="59"
+										defaultValue={String(minutes)}
+										aria-label={`${label} ${t("m")}`}
+										mix={[
+											on("focus", (event) =>
+												selectOnFocus(event.currentTarget),
+											),
+											on("mouseup", (event) =>
+												reassertSelectOnMouseUp(event.currentTarget, event),
+											),
+										]}
+									/>
+									<span class="unit" aria-hidden="true">
+										{t("m")}
+									</span>
+								</div>
+								<button
+									type="submit"
+									form={EDIT_DAY_FORM_ID}
+									class="edit-day-save"
+									aria-label={`${t("Save")} ${label}`}
+								>
+									<svg
+										viewBox="0 0 24 24"
+										aria-hidden="true"
+										width="16"
+										height="16"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="3"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<path d="M20 6 9 17l-5-5" />
+									</svg>
+								</button>
+							</li>
+						)
+					}
+
 					return (
 						<li key={day.getTime()} className="data-row">
 							<span>
 								{label}: {formatDuration(workedSec)}
 							</span>
-							{day.getTime() === today && (
-								<span class="today-chip">{t("Today")}</span>
-							)}
+							<span class="data-row__actions">
+								{isToday && <span class="today-chip">{t("Today")}</span>}
+								{!isToday && (
+									<button
+										type="button"
+										class="edit-day-toggle"
+										aria-label={`${t("Edit")} ${label}`}
+										mix={on("click", () => {
+											editingDayTime = day.getTime()
+											handle.update()
+										})}
+									>
+										<svg
+											viewBox="0 0 24 24"
+											aria-hidden="true"
+											width="16"
+											height="16"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<path d="M12 20h9" />
+											<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+										</svg>
+									</button>
+								)}
+							</span>
 						</li>
 					)
 				}
@@ -702,6 +865,32 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 
 		return (
 			<div class="time-page">
+				{
+					// A day-edit row's inputs/button bind here via a `form`
+					// attribute instead of wrapping their own <form> — the whole
+					// week-list can already be nested inside .catchup-form (when
+					// entryDays.length > 0), and a <form> can't itself nest inside
+					// another one (the browser silently drops the inner one).
+					// This stays a single, empty, unconditionally-rendered element
+					// so only one day can be mid-edit at a time.
+				}
+				<form
+					id={EDIT_DAY_FORM_ID}
+					mix={on("submit", (event) => {
+						event.preventDefault()
+						if (editingDayTime === null) return
+						const day = new Date(editingDayTime)
+						const currentWorkedSec =
+							weeklyBreakdown(data.events, now).find(
+								(entry) => entry.day.getTime() === editingDayTime,
+							)?.workedSec ?? 0
+						const formData = new FormData(event.currentTarget)
+						const minutes = readMinutes(formData, "hours", "minutes")
+						onEditDay(day, minutes, currentWorkedSec)
+						editingDayTime = null
+						handle.update()
+					})}
+				/>
 				{banner}
 				<div class="time-stats">
 					<p class="time-stat time-stat--day">

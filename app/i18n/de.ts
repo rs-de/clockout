@@ -11,6 +11,7 @@ export const de: Record<string, string> = {
 	'Demo: simulating "{name}" — {dateTime}. Nothing here is saved.':
 		'Demo: Simulation von "{name}" — {dateTime}. Hier wird nichts gespeichert.',
 	"Did not work": "Nicht gearbeitet",
+	Edit: "Bearbeiten",
 	"Forgot to stop": "Zu stoppen vergessen",
 	"Forgot to stop on Friday": "Am Freitag zu stoppen vergessen",
 	"German (17.07.2026, 24h)": "Deutsch (17.07.2026, 24h)",
@@ -27,6 +28,7 @@ export const de: Record<string, string> = {
 	"Passwords don't match": "Passwörter stimmen nicht überein",
 	Privacy: "Datenschutz",
 	"Repeat password": "Passwort wiederholen",
+	Save: "Speichern",
 	"Save and start tracking": "Speichern und los ...",
 	"Save hours": "Stunden speichern",
 	"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if your browser cache is cleared or you open the link to your clockout on another device. Recommendation: use a password manager!":

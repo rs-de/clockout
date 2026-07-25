@@ -206,3 +206,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 67. Fix today-chip contrast (3.25:1 on primary-9) caught by the a11y gate
     `(edit app.css: reuse .btn-coffee's darker literal blue, now 5.72:1)`
+
+68. Inline edit for an already-recorded day: pencil icon -> h/m fields -> save
+    `(add editDay "adjust" event to time-tracking.ts; wire into app.tsx/css)`

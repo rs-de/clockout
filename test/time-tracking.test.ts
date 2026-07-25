@@ -6,6 +6,7 @@ import {
 	createTrackingData,
 	DEFAULT_DAILY_MAX,
 	DEFAULT_WEEKLY_TARGET_MIN,
+	editDay,
 	formatDuration,
 	isRunning,
 	MIN_SESSION_SEC,
@@ -21,6 +22,10 @@ import {
 } from "../app/utils/time-tracking.ts"
 
 const H = 3600
+
+function dayEnd(date: Date): Date {
+	return new Date(date.getTime() + 24 * H * 1000)
+}
 
 function toSec(date: Date): number {
 	return Math.floor(date.getTime() / 1000)
@@ -809,6 +814,113 @@ describe("resolveCatchup", () => {
 			weeklyEntryDays(resolved, now).map((d) => d.getTime()),
 			[13, 14].map((date) => new Date(2026, 6, date).getTime()), // Mon, Tue
 		)
+	})
+})
+
+describe("editDay", () => {
+	const day = new Date(2026, 6, 13) // Monday
+
+	test("appends a positive adjust event when the entered total is higher", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+		]
+		// Current: 8h. Entered: 8h30m -> +30min.
+		assert.deepEqual(editDay(events, day, 8 * 60 + 30, 8 * H), [
+			...events,
+			{ t: toSec(day), type: "adjust", minutes: 30 },
+		])
+	})
+
+	test("appends a negative adjust event when the entered total is lower", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+		]
+		// Current: 8h. Entered: 6h -> -2h.
+		assert.deepEqual(editDay(events, day, 6 * 60, 8 * H), [
+			...events,
+			{ t: toSec(day), type: "adjust", minutes: -120 },
+		])
+	})
+
+	test("appends nothing when the entered total already matches", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+		]
+		assert.deepEqual(editDay(events, day, 8 * 60, 8 * H), events)
+	})
+
+	test("never touches the original start/stop events, only appends", () => {
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 12, 0)), type: "stop" as const },
+			{ t: toSec(new Date(2026, 6, 13, 13, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+		]
+		const result = editDay(events, day, 10 * 60, 8 * H)
+		assert.deepEqual(result.slice(0, events.length), events)
+		assert.equal(result.length, events.length + 1)
+	})
+
+	test("adding hours to a previously-blank day (e.g. a worked weekend) appends a fresh adjust", () => {
+		assert.deepEqual(editDay([], day, 90, 0), [
+			{ t: toSec(day), type: "adjust", minutes: 90 },
+		])
+	})
+
+	test("a second edit computes its delta from the already-adjusted total", () => {
+		const events = [{ t: toSec(day), type: "adjust" as const, minutes: 30 }]
+		// Caller passes the up-to-date total (8h30m) after the first edit.
+		assert.deepEqual(editDay(events, day, 9 * 60, 8 * H + 30 * 60), [
+			...events,
+			{ t: toSec(day), type: "adjust", minutes: 30 },
+		])
+	})
+})
+
+describe("workedSecondsInRange with adjust events", () => {
+	test("a positive adjust event within range adds its minutes", () => {
+		const day = new Date(2026, 6, 13)
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+			{ t: toSec(day), type: "adjust" as const, minutes: 30 },
+		]
+		const now = new Date(2026, 6, 13, 18, 0)
+		assert.equal(
+			workedSecondsInRange(events, day, dayEnd(day), now),
+			8 * H + 30 * 60,
+		)
+	})
+
+	test("a negative adjust event within range subtracts its minutes", () => {
+		const day = new Date(2026, 6, 13)
+		const events = [
+			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
+			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
+			{ t: toSec(day), type: "adjust" as const, minutes: -120 },
+		]
+		const now = new Date(2026, 6, 13, 18, 0)
+		assert.equal(workedSecondsInRange(events, day, dayEnd(day), now), 6 * H)
+	})
+
+	test("an adjust event on one day also folds into that week's total", () => {
+		const monday = new Date(2026, 6, 13)
+		const events = [{ t: toSec(monday), type: "adjust" as const, minutes: 90 }]
+		const now = new Date(2026, 6, 17, 12, 0)
+		const weekStart = startOfWeek(now)
+		const weekEnd = new Date(weekStart.getTime() + 7 * 24 * H * 1000)
+		assert.equal(workedSecondsInRange(events, weekStart, weekEnd, now), 90 * 60)
+	})
+
+	test("an adjust event outside the range is excluded", () => {
+		const monday = new Date(2026, 6, 13)
+		const tuesday = new Date(2026, 6, 14)
+		const events = [{ t: toSec(tuesday), type: "adjust" as const, minutes: 90 }]
+		const now = new Date(2026, 6, 14, 12, 0)
+		assert.equal(workedSecondsInRange(events, monday, dayEnd(monday), now), 0)
 	})
 })
 

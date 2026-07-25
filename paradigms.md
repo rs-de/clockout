@@ -43,3 +43,41 @@ hint sit visibly farther from its input than the rest. Fixed by zeroing
 the margin specifically where the parent already supplies the gap
 (`.form-field > .field-hint { margin-top: 0; }`) — one spacing mechanism
 wins per context, they don't both apply to the same element.
+
+## 3. Corrections are new events, not rewrites of history
+
+`TrackingData.events` (`app/utils/time-tracking.ts`) has been append-only
+from the start — `toggleTracking`/`resolveCatchup` only ever push new
+`start`/`stop`/`skipDay` events, never mutate or delete one. When the
+weekly-breakdown edit feature (2026-07-25) needed to let a user correct an
+*already-recorded* day's total, the first draft broke that rule: it deleted
+every event on that calendar day and rewrote a fresh pair. That's exactly
+the kind of change event-sourcing is meant to rule out on sight — it looked
+locally reasonable but was quietly unsafe the moment a day's events weren't
+self-contained (a session chained past midnight from `resolveCatchup` has
+its stop on the *next* calendar day; deleting "this day's events" would
+have orphaned that stop, corrupting the neighboring day). It also meant
+inventing a whole `isEditableDay` guard just to detect and forbid the
+unsafe cases.
+
+The fix was to stop rewriting anything. `editDay` appends a single signed
+`"adjust"` event — the delta between the entered total and the day's
+current total — anchored at that day's local midnight, and
+`workedSecondsInRange` sums any `"adjust"` events whose own timestamp falls
+in the queried range right alongside real start/stop overlap. Every
+consumer (`weeklyBreakdown`, `summarize`'s daily/weekly totals) picks the
+correction up automatically, with zero special-casing at any call site,
+because they all already go through the one shared range-summing function.
+This also deleted `isEditableDay` entirely: since nothing is rewritten,
+there's no unsafe case left to detect — any day, no matter how its
+existing events are shaped, can be corrected safely.
+
+**The general shape**: modeling history as an ordered log of facts that
+are only ever appended, never mutated or deleted, and letting every
+derived value (a total, a "current state") be *computed* from that log
+rather than stored and patched — the same principle applies whether the
+facts are literal domain events (as here) or a signed delta record like
+this one. A rewrite-in-place approach might look correct for the common
+case and only reveal its unsafe edges under a rarer combination the author
+didn't enumerate; the append-only version doesn't have those edges to find,
+because it never needs to reconstruct what to delete.

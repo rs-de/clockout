@@ -1,15 +1,23 @@
 import { nanoid } from "nanoid"
 
-export type TimeEventType = "start" | "stop" | "skipDay"
+export type TimeEventType = "start" | "stop" | "skipDay" | "adjust"
 
 export type TimeEvent = {
 	/**
-	 * Unix timestamp in seconds. For "skipDay" — an explicit "no work done
-	 * this day" marker, e.g. from the catch-up form — this is that day's
-	 * local midnight, not a real point-in-time event.
+	 * Unix timestamp in seconds. For "skipDay" and "adjust" — which aren't
+	 * real points in time — this is that day's local midnight instead.
 	 */
 	t: number
 	type: TimeEventType
+	/**
+	 * Only meaningful for "adjust": a signed minutes delta layered on top of
+	 * that day's real start/stop history (see `editDay`) — positive to add,
+	 * negative to subtract. Never touches the original events, so it folds
+	 * into daily *and* weekly totals automatically via
+	 * `workedSecondsInRange`, regardless of how many pairs (or none) already
+	 * cover that day.
+	 */
+	minutes?: number
 }
 
 /** How dates/times are displayed. Optional so a document persisted before
@@ -377,12 +385,44 @@ export function resolveCatchup(
 }
 
 /**
+ * Manually corrects an already-recorded day's total from the weekly
+ * breakdown — unlike `resolveCatchup`, which only fills in a *blank* day.
+ * Never touches the real start/stop history: appends a single signed
+ * "adjust" event for the difference between the entered total and
+ * `currentWorkedSec` (that day's total the caller already has, e.g. from
+ * `weeklyBreakdown` — recomputing it here would risk drifting out of sync
+ * with what the UI actually showed the user). A day with nothing to adjust
+ * (the entered value already matches) appends nothing.
+ */
+export function editDay(
+	events: TimeEvent[],
+	day: Date,
+	minutes: number,
+	currentWorkedSec: number,
+): TimeEvent[] {
+	const deltaMinutes = minutes - Math.round(currentWorkedSec / 60)
+	if (deltaMinutes === 0) return events
+	return [
+		...events,
+		{
+			t: Math.floor(day.getTime() / 1000),
+			type: "adjust",
+			minutes: deltaMinutes,
+		},
+	]
+}
+
+/**
  * Seconds worked within [rangeStart, rangeEnd), reconstructed from start/stop
  * events. A trailing unmatched start is treated as still running, clipped to
  * `now`. "skipDay" markers are pure no-ops here — they neither open nor
  * close a session — so they can never disrupt a real session that happens
  * to overlap one chronologically (e.g. a chained catch-up session spilling
- * into a day the user separately marked as skipped).
+ * into a day the user separately marked as skipped). "adjust" events (see
+ * `editDay`) add their signed minutes directly whenever their own timestamp
+ * falls in range — this is what makes a manual correction fold into both
+ * that day's and that week's totals automatically, with no special-casing
+ * needed at either call site.
  */
 export function workedSecondsInRange(
 	events: TimeEvent[],
@@ -404,6 +444,12 @@ export function workedSecondsInRange(
 		} else if (event.type === "stop" && openStart !== null) {
 			total += overlapSeconds(openStart, event.t, rangeStartSec, rangeEndSec)
 			openStart = null
+		} else if (
+			event.type === "adjust" &&
+			event.t >= rangeStartSec &&
+			event.t < rangeEndSec
+		) {
+			total += (event.minutes ?? 0) * 60
 		}
 	}
 
