@@ -46,3 +46,34 @@ export const assetServer = createAssetServer({
 		},
 	},
 })
+
+/**
+ * The style compiler (lightningcss, under the hood) emits a literal
+ * `"sourceRoot": null` in generated .css.map files instead of omitting the
+ * key. Per the source map spec sourceRoot must be a string or absent —
+ * Chrome silently ignores the null, but Safari logs "invalid sourceRoot"
+ * for it. Strip it so the map is spec-compliant everywhere.
+ */
+async function fixSourceMapResponse(response: Response): Promise<Response> {
+	const body: unknown = await response.json().catch(() => null)
+	if (
+		!body ||
+		typeof body !== "object" ||
+		(body as { sourceRoot?: unknown }).sourceRoot !== null
+	) {
+		return response
+	}
+	const { sourceRoot: _sourceRoot, ...rest } = body as { sourceRoot: null }
+	return new Response(JSON.stringify(rest), {
+		status: response.status,
+		statusText: response.statusText,
+		headers: response.headers,
+	})
+}
+
+export async function fetchAsset(request: Request): Promise<Response | null> {
+	const response = await assetServer.fetch(request)
+	if (!response) return null
+	if (!new URL(request.url).pathname.endsWith(".map")) return response
+	return fixSourceMapResponse(response)
+}

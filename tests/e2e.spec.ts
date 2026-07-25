@@ -1,4 +1,24 @@
-import { expect, test } from "@playwright/test"
+import { test as base, expect } from "@playwright/test"
+
+// Every test gets a console guard for free via this `page` override — a
+// warning or error (source-map issues, unhandled rejections, etc.) fails
+// the test instead of silently passing, so browser-console cleanliness is a
+// regression check, not something re-verified by hand on every change.
+const test = base.extend({
+	page: async ({ page }, use) => {
+		const issues: string[] = []
+		page.on("console", (msg) => {
+			if (msg.type() === "warning" || msg.type() === "error") {
+				issues.push(`${msg.type()}: ${msg.text()}`)
+			}
+		})
+		page.on("pageerror", (err) => issues.push(`pageerror: ${err.message}`))
+
+		await use(page)
+
+		expect(issues, issues.join("\n")).toEqual([])
+	},
+})
 
 test("home page loads the setup form", async ({ page }) => {
 	await page.goto("/")

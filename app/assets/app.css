@@ -520,7 +520,10 @@ select:disabled {
 
 .today-chip {
 	flex-shrink: 0;
-	background: hsl(var(--primary-9));
+	/* --primary-9 (used elsewhere for the fixed brand blue) is only 3.25:1
+	   against white at this text's size/weight — below the 4.5:1 AA
+	   minimum. Reuse .btn-coffee's darker literal shade (5.72:1) instead. */
+	background: hsl(206 100% 36%);
 	color: #fff;
 	font-size: 0.6875rem;
 	font-weight: var(--font-weight-7);

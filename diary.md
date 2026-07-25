@@ -197,3 +197,12 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 64. Move Start/Stop (and Save hours) to the bottom of the screen for thumb reach
     `(edit app.tsx: TrackingScreen renders week-list/catchup-form before button)`
+
+65. Fix Safari "invalid sourceRoot" warning (lightningcss emits null, not absent)
+    `(edit assets.ts/controller.tsx: fetchAsset strips null sourceRoot from .map)`
+
+66. Console-guard fixture: any warning/error/pageerror fails the e2e test
+    `(edit e2e.spec.ts: base.extend page override; update verify skill)`
+
+67. Fix today-chip contrast (3.25:1 on primary-9) caught by the a11y gate
+    `(edit app.css: reuse .btn-coffee's darker literal blue, now 5.72:1)`

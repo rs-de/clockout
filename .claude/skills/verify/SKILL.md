@@ -29,6 +29,23 @@ so no manual server launch is needed before running these.
 `tests/e2e.spec.ts`** — don't add a new spec file per feature; grow the one
 suite.
 
+## Console must be clean — always check, zero tolerance
+
+`tests/e2e.spec.ts` overrides the `page` fixture (`base.extend`) so every
+test fails on any `console` warning/error or `pageerror`, not just the ones
+a test happens to assert on. This is a permanent regression guard, not a
+one-off check — it caught nothing by luck; it's *supposed* to catch things.
+Keep this fixture when adding new tests; don't work around it by using the
+un-overridden `page` from `@playwright/test` directly.
+
+The same standard applies to manual/exploratory Playwright driving (see
+below): always attach `page.on("console", ...)` and `page.on("pageerror",
+...)` and report what they captured, even for a "just take a screenshot"
+pass. A clean console is part of "the change works," the same as a passing
+test — don't wait for it to be reported. Warnings are engine-specific (a
+sourceRoot issue once surfaced only in WebKit, not Chromium), so check both
+`chromium` and `webkit` when verifying anything that touches served assets.
+
 ## Manual one-off driving (exploratory only)
 
 For a quick manual look (not a permanent test), launch the dev server
@@ -48,7 +65,18 @@ server after editing any browser-served file (`app/ui/**`, `app/utils/**`,
 Since Playwright is already a project dependency, write a throwaway
 `.mjs` driver script directly against `chromium.launch()` (see
 `tests/e2e.spec.ts` for the app flow/selectors to reuse) and delete it
-when done — no need to install/remove the package anymore.
+when done — no need to install/remove the package anymore. Always wire up
+the console guard, e.g.:
+
+```js
+const page = await browser.newPage()
+page.on("console", (msg) => {
+	if (msg.type() === "warning" || msg.type() === "error") {
+		console.log(`${msg.type()}: ${msg.text()}`)
+	}
+})
+page.on("pageerror", (err) => console.log(`pageerror: ${err.message}`))
+```
 
 ## Flow to drive
 
