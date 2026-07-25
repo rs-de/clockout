@@ -140,10 +140,13 @@ small {
 }
 
 .sync-status {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
+	justify-content: center;
 	gap: 0.375rem;
 	margin: 0;
+	color: hsl(var(--slate-11));
+	font-size: 0.875rem;
 }
 
 .sync-status .spinner {
