@@ -53,6 +53,10 @@ type View =
 	// password managers key the saved password to this doc from the start.
 	| { kind: "setup"; id: string }
 	| { kind: "unlock"; id: string; error?: string }
+	// The home route (/) itself: local data already exists, but / is a
+	// landing page, not the tracking screen — it only links to the
+	// bookmarkable /d/:id, which is where "tracking" actually renders.
+	| { kind: "home"; data: TrackingData }
 	| { kind: "tracking"; data: TrackingData }
 	// In-memory only — see app/utils/examples.ts. `offsetMs` is the fixed
 	// gap between the example's pretend "now" and the real clock, captured
@@ -191,7 +195,15 @@ export const App = clientEntry(
 		let sessionKey: TrackingSyncKey | null = null
 		const syncEngine = createSyncEngine(() => handle.update())
 
-		handle.queueTask(async (signal) => {
+		// Reads the current URL and resolves which view it maps to. Not just a
+		// one-shot mount-time check: a soft (frame) navigation — e.g. clicking
+		// the logo from an /example/:id page back to / — reuses this exact
+		// component instance rather than remounting it, since both routes
+		// render the same <App>. Without re-running this on every such
+		// navigation, `view` stays frozen on whatever it resolved to at true
+		// mount while the URL (and browser history) moves on underneath it —
+		// the page looks like clicking the link did nothing.
+		async function resolveView(signal: AbortSignal) {
 			// An example URL always wins, even over existing real local data —
 			// it's never written to storage, so showing it can't lose anything,
 			// and a user who explicitly opened the link should see it.
@@ -206,14 +218,22 @@ export const App = clientEntry(
 			const data = await loadTrackingData()
 			if (signal.aborted) return
 			if (data) {
-				view = { kind: "tracking", data }
+				// / is a landing page, not the tracking screen itself — only
+				// /d/:id (the bookmarkable URL setup already redirects to) shows
+				// the real thing.
+				view =
+					window.location.pathname === "/"
+						? { kind: "home", data }
+						: { kind: "tracking", data }
 				sessionKey = (await loadSyncKey()) ?? null
 			} else {
 				const id = readDocIdFromUrl()
 				view = id ? { kind: "unlock", id } : { kind: "setup", id: nanoid() }
 			}
 			handle.update()
-		})
+		}
+
+		handle.queueTask((signal) => resolveView(signal))
 
 		// Keeps the always-visible remaining time live. Browser-only: on the server
 		// this timer would outlive the one-shot SSR render and crash the process.
@@ -221,6 +241,16 @@ export const App = clientEntry(
 			const interval = setInterval(() => handle.update(), 1000)
 			handle.signal.addEventListener("abort", () => clearInterval(interval))
 			syncEngine.init(handle.signal)
+
+			handle.frames.top.addEventListener(
+				"reloadComplete",
+				() => {
+					view = { kind: "loading" }
+					handle.update()
+					handle.queueTask((signal) => resolveView(signal))
+				},
+				{ signal: handle.signal },
+			)
 		}
 
 		async function handleSetupSubmit(formData: FormData, id: string) {
@@ -584,6 +614,21 @@ export const App = clientEntry(
 							{t("Save and start tracking")}
 						</button>
 					</form>
+				)
+			}
+
+			if (view.kind === "home") {
+				const { data } = view
+				return (
+					<div class="form-card">
+						<h1>ClockOut</h1>
+						<p class="form-intro">
+							{t("You already have a clockout on this device.")}
+						</p>
+						<a href={`/d/${data.id}`} class="btn btn-primary">
+							{t("Go to your time tracking")}
+						</a>
+					</div>
 				)
 			}
 

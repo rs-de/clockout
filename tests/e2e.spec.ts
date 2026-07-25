@@ -110,3 +110,52 @@ test("editing an already-recorded day updates its total and the week's remaining
 	// "adjust" delta, not a value the UI computes and pushes separately.
 	await expect(weekRemaining).not.toHaveText(weekRemainingBefore ?? "")
 })
+
+test("clicking the logo from an example re-resolves the view instead of freezing it", async ({
+	page,
+}) => {
+	// / and /example/:id both render the same top-level <App>, so a soft
+	// (frame) navigation between them reuses the same component instance
+	// instead of remounting it — the URL-based view must be re-resolved
+	// explicitly on navigation, or the page keeps showing the example after
+	// the URL has already moved on.
+	await page.goto("/example/steady-week")
+	await expect(page.getByText('Demo: simulating "A steady week"')).toBeVisible()
+
+	await page.click(".app-nav__brand-wrapper a")
+
+	await expect(page).toHaveURL(/\/$/)
+	await expect(page.getByText(/Demo: simulating/)).toHaveCount(0)
+	await expect(
+		page.getByRole("button", { name: "Save and start tracking" }),
+	).toBeVisible()
+})
+
+test("home shows a link to the existing doc, not the tracking screen directly", async ({
+	page,
+}) => {
+	await page.goto("/")
+	await page.getByLabel("Password", { exact: true }).fill("correct horse")
+	await page.getByLabel("Repeat password").fill("correct horse")
+	await page.getByRole("button", { name: "Save and start tracking" }).click()
+	await expect(page).toHaveURL(/\/d\//)
+	const docUrl = page.url()
+
+	// Simulate the same soft-navigation path as the logo: go elsewhere, then
+	// back to / while local data already exists.
+	await page.goto("/example/lunch-break")
+	await page.click(".app-nav__brand-wrapper a")
+
+	await expect(page).toHaveURL(/\/$/)
+	const homeLink = page.getByRole("link", { name: "Go to your time tracking" })
+	await expect(homeLink).toBeVisible()
+	await expect(
+		page.getByRole("button", { name: /^(Start|Stop)$/ }),
+	).toHaveCount(0)
+
+	await homeLink.click()
+	await expect(page).toHaveURL(docUrl)
+	await expect(
+		page.getByRole("button", { name: /^(Start|Stop)$/ }),
+	).toBeVisible()
+})
