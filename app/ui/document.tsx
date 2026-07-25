@@ -10,6 +10,7 @@ export interface DocumentProps {
 	head?: RemixNode
 	title?: string
 	lang?: Lang
+	manifestHref?: string
 }
 
 const DEFAULT_TITLE = readAppDisplayName("ClockOut")
@@ -58,6 +59,7 @@ export function Document(handle: Handle<DocumentProps>) {
 			head,
 			title = DEFAULT_TITLE,
 			lang = DEFAULT_LANG,
+			manifestHref = "/manifest.webmanifest",
 		} = handle.props
 		const t = createTranslator(lang)
 
@@ -73,7 +75,7 @@ export function Document(handle: Handle<DocumentProps>) {
 							"Lean, private time tracking that shows how much time is left today and this week.",
 						)}
 					/>
-					<link rel="manifest" href="/manifest.webmanifest" />
+					<link rel="manifest" href={manifestHref} />
 					<link rel="apple-touch-icon" href="/icons/apple-icon-180.png" />
 					<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 					{/* apple-mobile-web-app-capable is deprecated in favor of the

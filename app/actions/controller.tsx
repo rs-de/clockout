@@ -65,14 +65,6 @@ export default createController(routes, {
 				</Document>,
 			)
 		},
-		doc(context) {
-			const lang = resolveLang(context.request.headers.get("accept-language"))
-			return context.render(
-				<Document lang={lang}>
-					<App lang={lang} />
-				</Document>,
-			)
-		},
 		example(context) {
 			const lang = resolveLang(context.request.headers.get("accept-language"))
 			return context.render(
