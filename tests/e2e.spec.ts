@@ -159,3 +159,47 @@ test("home shows a link to the existing doc, not the tracking screen directly", 
 		page.getByRole("button", { name: /^(Start|Stop)$/ }),
 	).toBeVisible()
 })
+
+test("clearing local storage requires re-entering the password to unlock", async ({
+	page,
+}) => {
+	await page.goto("/")
+	await page.getByLabel("Password", { exact: true }).fill("correct horse")
+	await page.getByLabel("Repeat password").fill("correct horse")
+	await page.getByRole("button", { name: "Save and start tracking" }).click()
+	await expect(page).toHaveURL(/\/d\//)
+	const docUrl = page.url()
+
+	// Setup fires off the first sync itself — wait for it so the server
+	// actually has an encrypted copy to unlock against below.
+	await expect(page.getByRole("status")).toHaveText("Synced")
+
+	// Simulate a fresh browser / cleared cache: wipe the IndexedDB the sync
+	// key and plaintext copy live in, then revisit the bookmarkable doc URL.
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve, reject) => {
+				const request = indexedDB.deleteDatabase("clockout")
+				request.onsuccess = () => resolve()
+				request.onerror = () => reject(request.error)
+			}),
+	)
+	await page.goto(docUrl)
+	await expect(
+		page.getByText("This browser doesn't have local data for this link."),
+	).toBeVisible()
+
+	// A wrong password must surface an error, not silently fail or unlock.
+	await page.getByLabel("Password").fill("wrong horse")
+	await page.getByRole("button", { name: "Unlock" }).click()
+	await expect(page.getByRole("alert")).toHaveText("Wrong password.")
+
+	// The correct password re-derives the same sync key from the doc's salt
+	// and decrypts the server copy back into the tracking view.
+	await page.getByLabel("Password").fill("correct horse")
+	await page.getByRole("button", { name: "Unlock" }).click()
+	await expect(page).toHaveURL(docUrl)
+	await expect(
+		page.getByRole("button", { name: /^(Start|Stop)$/ }),
+	).toBeVisible()
+})
