@@ -1051,13 +1051,15 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 					<ul class="week-list">{weekList}</ul>
 				)}
 				{
-					// A dangling start from an earlier day (not today) has nothing
-					// live to "stop" — closing it here would just slap a "stop" on
-					// it at whatever moment this button happens to get clicked,
-					// silently collapsing the whole unresolved gap (including any
-					// still-dangling weekend) into one bogus multi-day session.
-					// Only the catch-up form above can close it correctly, per day.
-					!(summary.isRunning && summary.startedAt === null) && (
+					// Hidden while any day this week still needs a catch-up answer.
+					// This also covers a dangling start from an earlier day (not
+					// today): it has nothing live to "stop", and closing it here
+					// would just slap a "stop" on it at whatever moment this button
+					// happens to get clicked, silently collapsing the whole
+					// unresolved gap (including any still-dangling weekend) into one
+					// bogus multi-day session — only the catch-up form above can
+					// close it correctly, per day.
+					entryDays.length === 0 && (
 						<button
 							type="button"
 							className="toggle-button"

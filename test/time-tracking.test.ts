@@ -424,8 +424,13 @@ describe("catchupDays", () => {
 })
 
 describe("weeklyEntryDays", () => {
-	test("empty for a document with no events at all yet", () => {
-		assert.deepEqual(weeklyEntryDays([], new Date(2026, 6, 16, 10, 0)), [])
+	test("with zero events ever, every elapsed weekday this week still needs an answer", () => {
+		const now = new Date(2026, 6, 18, 10, 0) // Saturday
+
+		assert.deepEqual(
+			weeklyEntryDays([], now).map((d) => d.getTime()),
+			[13, 14, 15, 16, 17].map((date) => new Date(2026, 6, date).getTime()),
+		)
 	})
 
 	test("includes days before the very first tracked event, within the current week", () => {

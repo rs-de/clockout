@@ -203,14 +203,13 @@ export function catchupDays(events: TimeEvent[], now: Date): Date[] {
  * backfilling: the classic gap from `catchupDays`, plus any other day this
  * week with no events overlapping it at all — e.g. a Monday before the very
  * first thing ever tracked, which `catchupDays` alone wouldn't catch since
- * it only looks forward from the last event. Always chronological, so
- * `resolveCatchup`'s day-identity matching lines up. Empty for a document
- * with no events yet at all — a brand-new setup shouldn't immediately
- * demand backfilling days nobody has touched yet.
+ * it only looks forward from the last event. Driven entirely by the event
+ * log, so this applies even with zero events ever recorded: no events means
+ * no work happened, and every elapsed weekday this week still needs an
+ * explicit answer. Always chronological, so `resolveCatchup`'s day-identity
+ * matching lines up.
  */
 export function weeklyEntryDays(events: TimeEvent[], now: Date): Date[] {
-	if (events.length === 0) return []
-
 	const gapDays = catchupDays(events, now)
 	const gapDaySet = new Set(gapDays.map((day) => day.getTime()))
 

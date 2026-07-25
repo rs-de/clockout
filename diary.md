@@ -239,3 +239,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 78. Add release:patch/minor/major scripts to trigger the deploy tag
     `(edit package.json/README.md/CLAUDE.md: pnpm version + push + tags)`
+
+79. Backfill is fully data-driven; hide Start/Stop until week is answered
+    `(edit time-tracking.ts/app.tsx/*.test.ts/e2e.spec.ts: guard + toggle gate)`

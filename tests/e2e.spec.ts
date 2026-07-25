@@ -1,4 +1,4 @@
-import { test as base, expect } from "@playwright/test"
+import { test as base, expect, type Page } from "@playwright/test"
 
 // Every test gets a console guard for free via this `page` override — a
 // warning or error (source-map issues, unhandled rejections, etc.) fails
@@ -20,6 +20,29 @@ const test = base.extend({
 	},
 })
 
+// The Start/Stop toggle stays hidden while any day this week still needs a
+// catch-up answer — true for a brand-new setup on any weekday but Monday,
+// since every elapsed weekday with no events counts as pending. Real tests
+// that just need to get past setup resolve it the same way a user would:
+// mark every pending day "Did not work".
+async function resolvePendingWeek(page: Page) {
+	const saveButton = page.getByRole("button", { name: "Save hours" })
+	const toggleButton = page.getByRole("button", { name: /^(Start|Stop)$/ })
+	// The tracking screen renders asynchronously (IndexedDB load) after the
+	// URL already changed, so wait for whichever of the two actually shows up
+	// instead of sampling the DOM immediately.
+	await saveButton.or(toggleButton).first().waitFor()
+	if ((await saveButton.count()) === 0) return
+	for (const checkbox of await page.getByLabel("Did not work").all()) {
+		await checkbox.check()
+	}
+	await saveButton.click()
+	// The submit handler awaits its IndexedDB write before re-rendering, so
+	// waiting for the toggle to reappear guarantees the save actually landed
+	// before the test navigates away.
+	await toggleButton.waitFor()
+}
+
 test("home page loads the setup form", async ({ page }) => {
 	await page.goto("/")
 	await expect(page.locator("h1")).toHaveText("ClockOut")
@@ -37,6 +60,7 @@ test("setup creates tracking data, toggling persists across reload", async ({
 	await page.getByRole("button", { name: "Save and start tracking" }).click()
 
 	await expect(page).toHaveURL(/\/d\//)
+	await resolvePendingWeek(page)
 	const toggle = page.getByRole("button", { name: "Start" })
 	await expect(toggle).toBeVisible()
 
@@ -139,6 +163,7 @@ test("home shows a link to the existing doc, not the tracking screen directly", 
 	await page.getByLabel("Repeat password").fill("correct horse")
 	await page.getByRole("button", { name: "Save and start tracking" }).click()
 	await expect(page).toHaveURL(/\/d\//)
+	await resolvePendingWeek(page)
 	const docUrl = page.url()
 
 	// Simulate the same soft-navigation path as the logo: go elsewhere, then
@@ -171,6 +196,7 @@ test("clearing local storage requires re-entering the password to unlock", async
 	// the time the URL below actually changes, the server already has an
 	// encrypted copy to unlock against.
 	await expect(page).toHaveURL(/\/d\//)
+	await resolvePendingWeek(page)
 	const docUrl = page.url()
 
 	// Simulate a fresh browser / cleared cache: wipe the IndexedDB the sync
