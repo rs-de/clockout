@@ -1,10 +1,13 @@
 import { execSync } from "node:child_process"
 
 import { createAssetServer } from "remix/assets"
+import pkg from "../package.json" with { type: "json" }
 
 const rootDir = process.cwd()
 const nodeEnv = process.env.NODE_ENV ?? "development"
 const isDevelopment = nodeEnv === "development"
+
+export const appVersion = pkg.version
 
 function getBuildStamp(): string {
 	try {

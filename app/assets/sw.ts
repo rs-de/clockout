@@ -10,6 +10,13 @@ const IS_DEV = process.env.NODE_ENV === "development"
 const CACHE = `clockout-v${BUILD_STAMP}`
 const PRECACHE_URLS = ["/", "/about"]
 
+// A page that just told the user "a new version is available" and is about
+// to navigate to reload wants that one navigation to actually be fresh —
+// staleWhileRevalidate would otherwise happily hand back the copy it already
+// has and only pick up the new one on the *following* request. Set right
+// before the deliberate reload navigation and consumed (deleted) by it.
+const forceFreshUrls = new Set<string>()
+
 self.addEventListener("install", (event) => {
 	self.skipWaiting()
 	// Each URL is cached individually — unlike cache.addAll(), one slow/failed
@@ -26,12 +33,24 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
 	event.waitUntil(
 		caches.keys().then(async (keys) => {
-			await Promise.all(
-				keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)),
-			)
+			const oldKeys = keys.filter((key) => key !== CACHE)
+			// An old cache existing means this activation replaced a previously
+			// installed worker — a real update, not the very first install — so
+			// tell open tabs a new version is available.
+			const isUpdate = oldKeys.length > 0
+			await Promise.all(oldKeys.map((key) => caches.delete(key)))
 			await self.clients.claim()
+			if (isUpdate) {
+				const clients = await self.clients.matchAll({ type: "window" })
+				for (const client of clients) client.postMessage({ type: "SW_UPDATED" })
+			}
 		}),
 	)
+})
+
+self.addEventListener("message", (event) => {
+	if (event.data?.type !== "CO_FORCE_FRESH") return
+	forceFreshUrls.add(event.data.url as string)
 })
 
 self.addEventListener("fetch", (event) => {
@@ -82,6 +101,7 @@ async function staleWhileRevalidate(request: Request): Promise<Response> {
 			return response
 		})
 		.catch(() => cached ?? new Response("Offline", { status: 503 }))
+	if (forceFreshUrls.delete(request.url)) return fetchPromise
 	return cached ?? fetchPromise
 }
 

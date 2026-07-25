@@ -227,3 +227,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 74. Fix ClockOut brand casing: title, manifest, About heading, alt text, README
     `(edit document.tsx/controller.tsx/navbar.tsx/about.tsx/app.tsx/de.ts/README.md)`
+
+75. Add version-update banner + Add-to-Home-Screen hint (site default pattern)
+    `(add /api/version, SW_UPDATED/CO_FORCE_FRESH; edit entry.ts/sw.ts/app.css/de.ts)`

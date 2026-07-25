@@ -4,6 +4,7 @@ export const routes = route({
 	assets: get("/assets/*path"),
 	sw: get("/sw.js"),
 	manifest: get("/manifest.webmanifest"),
+	version: get("/api/version"),
 	home: "/",
 	// Bookmarkable per-document URL, used to recover after local storage is
 	// cleared (fetch by id, then unlock with the password).

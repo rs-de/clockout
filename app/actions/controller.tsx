@@ -1,6 +1,6 @@
 import { createController } from "remix/router"
 
-import { fetchAsset } from "../assets.ts"
+import { appVersion, fetchAsset } from "../assets.ts"
 import { routes } from "../routes.ts"
 import { AboutPage } from "../ui/about.tsx"
 import { App } from "../ui/app.tsx"
@@ -21,6 +21,9 @@ export default createController(routes, {
 				(await fetchAsset(new Request(url.toString()))) ??
 				new Response("Not Found", { status: 404 })
 			)
+		},
+		version() {
+			return Response.json({ version: appVersion })
 		},
 		manifest(context) {
 			const lang = resolveLang(context.request.headers.get("accept-language"))

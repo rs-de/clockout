@@ -3,6 +3,8 @@ export const de: Record<string, string> = {
 	"A steady week": "Eine ruhige Woche",
 	About: "Über",
 	"About ClockOut": "Über ClockOut",
+	"Add to your homescreen for quick access":
+		"Zum Startbildschirm hinzufügen für schnellen Zugriff",
 	"Back to examples": "Zurück zu den Beispielen",
 	"Browser default": "Browserstandard",
 	"ClockOut is a lean, private time tracker: clock in, clock out, and see at a glance how much time is left today and this week. No account needed — your data is encrypted in your browser before it's synced, so only you can unlock it. Try one of the example scenarios below to see it in action.":
@@ -23,14 +25,17 @@ export const de: Record<string, string> = {
 		"Wie Datum und Uhrzeit in der App angezeigt werden.",
 	"ISO 8601 (2026-07-17, 24h)": "ISO 8601 (2026-07-17, 24h)",
 	Imprint: "Impressum",
+	Install: "Installieren",
 	"Lean, private time tracking that shows how much time is left today and this week.":
 		"Schlanke, private Zeiterfassung, die zeigt, wie viel Zeit heute und diese Woche noch bleibt.",
 	Loading: "Wird geladen",
 	"Lunch break": "Mittagspause",
+	"New version available": "Neue Version verfügbar",
 	"No data found for this link.": "Keine Daten für diesen Link gefunden.",
 	Password: "Passwort",
 	"Passwords don't match": "Passwörter stimmen nicht überein",
 	Privacy: "Datenschutz",
+	Refresh: "Aktualisieren",
 	"Repeat password": "Passwort wiederholen",
 	Save: "Speichern",
 	"Save and start tracking": "Speichern und los ...",
@@ -45,6 +50,8 @@ export const de: Record<string, string> = {
 	"Sync failed (offline?)": "Synchronisierung fehlgeschlagen (offline?)",
 	Synced: "Synchronisiert",
 	"Syncing...": "Synchronisiere ...",
+	'Tap Share ⬆ then "Add to Home Screen"':
+		'Tippe auf Teilen ⬆, dann auf "Zum Home-Bildschirm"',
 	"This browser doesn't have local data for this link.":
 		"Dieser Browser hat keine lokalen Daten für diesen Link.",
 	Today: "Heute",
