@@ -119,11 +119,18 @@ small {
 	}
 }
 
+/* Fixed + --layer-important: a page spinner is a blocking backdrop over
+   the whole app (nav/footer included), not an in-flow page element —
+   shown while setup/unlock submission is in flight, so nothing under it
+   should read as interactive in the meantime. */
 .loading-screen {
+	position: fixed;
+	inset: 0;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 2rem;
+	background: hsl(var(--slate-12) / 0.55);
+	z-index: var(--layer-important);
 }
 
 .loading-screen .spinner {
