@@ -4,3 +4,6 @@ data/
 tmp/
 .env
 .DS_Store
+test-results/
+playwright-report/
+.claude/

@@ -230,3 +230,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 75. Add version-update banner + Add-to-Home-Screen hint (site default pattern)
     `(add /api/version, SW_UPDATED/CO_FORCE_FRESH; edit entry.ts/sw.ts/app.css/de.ts)`
+
+76. Add tag-triggered deploy pipeline (site default recipe, no DB/Prisma step)
+    `(add .github/workflows/deploy.yml; edit .dockerignore)`
