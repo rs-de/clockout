@@ -33,16 +33,15 @@ export const assetServer = createAssetServer({
 		"node_modules/**",
 	],
 	deny: ["app/**/*.server.*"],
-	// No bundling here — every source file is served individually, compiled
-	// but unminified in dev (comments and structure intact, just import
-	// specifiers rewritten and TS types/JSX stripped), so a source map buys
-	// little: devtools already point at something close to the original.
-	// Not worth it against what it's cost so far — a Safari-only
-	// "sourceRoot": null warning, then an outright server crash
-	// (ERR_INVALID_STATE: ReadableStream is locked) from working around
-	// that, both rooted in the asset compiler's own (pre-1.0 beta) map
-	// generation, not something under app control. Already off in
-	// production; this turns it off in dev too.
+	// Turning this off entirely (rather than fixing the map response, see
+	// fetchAsset below) looked simpler but broke something else: with
+	// sourceMaps off, the asset server refuses *every* .map request outright
+	// — including for @remix-run/ui's own prebuilt dist files, which ship
+	// with a real, valid, already-on-disk .map next to each .js and worked
+	// fine before any of this. Turning it back on and fixing the response
+	// instead (see fetchAsset) fixes the app's own maps without breaking
+	// passthrough serving of maps this app doesn't generate at all.
+	sourceMaps: isDevelopment ? "external" : undefined,
 	minify: !isDevelopment,
 	// Off in prod: fingerprinting assumes files on disk won't change (see
 	// README). On in dev, or edits like this one never take effect without
@@ -55,3 +54,52 @@ export const assetServer = createAssetServer({
 		},
 	},
 })
+
+/**
+ * The style compiler (lightningcss, under the hood) emits a literal
+ * `"sourceRoot": null` in generated .css.map files instead of omitting the
+ * key. Per the source map spec sourceRoot must be a string or absent —
+ * Chrome silently ignores the null, but Safari logs "invalid sourceRoot"
+ * for it. Strip it so the map is spec-compliant everywhere.
+ *
+ * Every branch below returns a *new* Response, never the original: reading
+ * a Response's body (`.text()`) permanently consumes its stream, so
+ * returning the same `response` object afterward — even unchanged — hands
+ * the caller an already-disturbed stream. That crashed every non-CSS .map
+ * request (JS/TS maps, including @remix-run/ui's own prebuilt ones, have
+ * no `sourceRoot` at all, so they always hit the "no change needed"
+ * branch) with `ERR_INVALID_STATE: ReadableStream is locked` deep in the
+ * server's own response-sending code — surfacing to the browser as a bare
+ * failed request. Dev-only: this whole helper is a no-op in production.
+ */
+async function fixSourceMapResponse(response: Response): Promise<Response> {
+	const text = await response.text()
+	const init = {
+		status: response.status,
+		statusText: response.statusText,
+		headers: response.headers,
+	}
+
+	let body: unknown
+	try {
+		body = JSON.parse(text)
+	} catch {
+		return new Response(text, init)
+	}
+	if (
+		!body ||
+		typeof body !== "object" ||
+		(body as { sourceRoot?: unknown }).sourceRoot !== null
+	) {
+		return new Response(text, init)
+	}
+	const { sourceRoot: _sourceRoot, ...rest } = body as { sourceRoot: null }
+	return new Response(JSON.stringify(rest), init)
+}
+
+export async function fetchAsset(request: Request): Promise<Response | null> {
+	const response = await assetServer.fetch(request)
+	if (!response) return null
+	if (!new URL(request.url).pathname.endsWith(".map")) return response
+	return fixSourceMapResponse(response)
+}
