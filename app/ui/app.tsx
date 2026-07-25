@@ -70,6 +70,16 @@ function readExampleIdFromUrl(): string | null {
 	return EXAMPLE_URL_PATTERN.exec(window.location.pathname)?.[1] ?? null
 }
 
+/**
+ * The real UI path is already fully constrained by each field's own
+ * `min`/`max`/`type="number"` — the browser blocks submission entirely for
+ * an out-of-range or non-numeric value (native constraint validation runs
+ * before the submit event even fires). This guards the one path that
+ * bypasses that: FormData built or edited outside the real form (devtools,
+ * a future regression). Without it, a non-numeric field yields `NaN`,
+ * which would get permanently written into persisted settings or an
+ * "adjust" event and poison every total that reads it from then on.
+ */
 function readMinutes(
 	formData: FormData,
 	hoursField: string,
@@ -77,6 +87,7 @@ function readMinutes(
 ): number {
 	const hours = Number(formData.get(hoursField))
 	const minutes = Number(formData.get(minutesField))
+	if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 0
 	return hours * 60 + minutes
 }
 
@@ -438,6 +449,16 @@ export const App = clientEntry(
 								type="password"
 								autoComplete="new-password"
 								required
+								// This password is the only thing protecting synced data —
+								// the server stores the ciphertext at an unauthenticated,
+								// publicly reachable URL (see sync/controller.tsx) and never
+								// checks it, so a weak password is the one remaining line of
+								// defense against anyone who obtains that URL. Only enforced
+								// here at creation, not on the unlock form — that must keep
+								// accepting whatever password an existing doc was already set
+								// up with.
+								minLength={8}
+								maxLength={128}
 								mix={on("input", (event) => {
 									syncPasswordMatchValidity(event.currentTarget.form, t)
 								})}
@@ -451,6 +472,8 @@ export const App = clientEntry(
 								type="password"
 								autoComplete="new-password"
 								required
+								minLength={8}
+								maxLength={128}
 								mix={on("input", (event) => {
 									syncPasswordMatchValidity(event.currentTarget.form, t)
 								})}

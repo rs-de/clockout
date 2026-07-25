@@ -209,3 +209,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 68. Inline edit for an already-recorded day: pencil icon -> h/m fields -> save
     `(add editDay "adjust" event to time-tracking.ts; wire into app.tsx/css)`
+
+69. Input validation audit: password strength, sync payload/body size caps
+    `(edit app.tsx: minLength=8 on setup password; sync/controller.tsx: caps)`
