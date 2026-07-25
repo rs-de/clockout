@@ -495,7 +495,7 @@ export const App = clientEntry(
 
 						<p class="form-intro">
 							{t(
-								"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if your browser cache is cleared or you open the link to your clockout on another device. Recommendation: use a password manager!",
+								"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if your browser cache is cleared or you open the link to your ClockOut on another device. Recommendation: use a password manager!",
 							)}
 						</p>
 
@@ -664,7 +664,7 @@ export const App = clientEntry(
 					<div class="form-card">
 						<h1>ClockOut</h1>
 						<p class="form-intro">
-							{t("You already have a clockout on this device.")}
+							{t("You already have a ClockOut on this device.")}
 						</p>
 						<a href={`/d/${data.id}`} class="btn btn-primary">
 							{t("Go to your time tracking")}

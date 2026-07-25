@@ -27,8 +27,8 @@ export default createController(routes, {
 			const t = createTranslator(lang)
 			return new Response(
 				JSON.stringify({
-					name: "clockout",
-					short_name: "clockout",
+					name: "ClockOut",
+					short_name: "ClockOut",
 					description: t(
 						"Lean, private time tracking that shows how much time is left today and this week.",
 					),

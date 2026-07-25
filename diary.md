@@ -224,3 +224,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 73. Real navigation on setup/unlock + Credential Management API for save-password
     `(edit app.tsx/sync-engine.ts: navigate post-sync; add password-credential.d.ts)`
+
+74. Fix ClockOut brand casing: title, manifest, About heading, alt text, README
+    `(edit document.tsx/controller.tsx/navbar.tsx/about.tsx/app.tsx/de.ts/README.md)`

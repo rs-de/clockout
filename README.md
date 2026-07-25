@@ -1,4 +1,4 @@
-# Clockout
+# ClockOut
 
 A minimal Remix application starter with a home page.
 

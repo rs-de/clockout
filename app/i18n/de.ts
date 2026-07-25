@@ -2,9 +2,11 @@
 export const de: Record<string, string> = {
 	"A steady week": "Eine ruhige Woche",
 	About: "Über",
-	"About clockout": "Über clockout",
+	"About ClockOut": "Über ClockOut",
 	"Back to examples": "Zurück zu den Beispielen",
 	"Browser default": "Browserstandard",
+	"ClockOut is a lean, private time tracker: clock in, clock out, and see at a glance how much time is left today and this week. No account needed — your data is encrypted in your browser before it's synced, so only you can unlock it. Try one of the example scenarios below to see it in action.":
+		"ClockOut ist eine schlanke, private Zeiterfassung: einstempeln, ausstempeln und auf einen Blick sehen, wie viel Zeit heute und diese Woche noch bleibt. Kein Konto nötig — deine Daten werden im Browser verschlüsselt, bevor sie synchronisiert werden, sodass nur du sie entsperren kannst. Probiere unten eines der Beispiele aus, um sie in Aktion zu sehen.",
 	"Daily max": "Maximale Tagesarbeitszeit",
 	"Date format": "Datumsformat",
 	"Day remaining: {duration}": "Verbleibend heute: {duration}",
@@ -33,8 +35,8 @@ export const de: Record<string, string> = {
 	Save: "Speichern",
 	"Save and start tracking": "Speichern und los ...",
 	"Save hours": "Stunden speichern",
-	"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if your browser cache is cleared or you open the link to your clockout on another device. Recommendation: use a password manager!":
-		"Vergib ein Passwort, um deine Daten vor der Online-Synchronisierung zu verschlüsseln — nur du kannst sie entschlüsseln. Du brauchst es nur erneut, wenn der Browser Cache gelöscht wird oder du den Link zu deinem clockout auf einem andern Gerät öffnest. Empfehlung: Benutze einen Passwort Manager!",
+	"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if your browser cache is cleared or you open the link to your ClockOut on another device. Recommendation: use a password manager!":
+		"Vergib ein Passwort, um deine Daten vor der Online-Synchronisierung zu verschlüsseln — nur du kannst sie entschlüsseln. Du brauchst es nur erneut, wenn der Browser Cache gelöscht wird oder du den Link zu deinem ClockOut auf einem andern Gerät öffnest. Empfehlung: Benutze einen Passwort Manager!",
 	'Some days this week have no tracked hours yet. Enter how many hours you worked, or check "Did not work".':
 		'Für einige Tage dieser Woche sind noch keine Stunden erfasst. Trage ein, wie viele Stunden du gearbeitet hast, oder markiere "Nicht gearbeitet".',
 	Start: "Start",
@@ -55,10 +57,8 @@ export const de: Record<string, string> = {
 	"Week remaining: {duration}": "Verbleibend diese Woche: {duration}",
 	"Weekly target": "Wochenarbeitszeit",
 	"Wrong password.": "Falsches Passwort.",
-	"You already have a clockout on this device.":
-		"Du hast bereits ein clockout auf diesem Gerät.",
-	"clockout is a lean, private time tracker: clock in, clock out, and see at a glance how much time is left today and this week. No account needed — your data is encrypted in your browser before it's synced, so only you can unlock it. Try one of the example scenarios below to see it in action.":
-		"clockout ist eine schlanke, private Zeiterfassung: einstempeln, ausstempeln und auf einen Blick sehen, wie viel Zeit heute und diese Woche noch bleibt. Kein Konto nötig — deine Daten werden im Browser verschlüsselt, bevor sie synchronisiert werden, sodass nur du sie entsperren kannst. Probiere unten eines der Beispiele aus, um sie in Aktion zu sehen.",
+	"You already have a ClockOut on this device.":
+		"Du hast bereits ein ClockOut auf diesem Gerät.",
 	h: "h",
 	m: "min",
 }

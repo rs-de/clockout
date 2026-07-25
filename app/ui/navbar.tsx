@@ -9,7 +9,7 @@ export function Navbar(_handle: Handle) {
 						<img
 							width={80}
 							height={40}
-							alt="clockout"
+							alt="ClockOut"
 							src="/logo.svg"
 							class="app-nav__logo"
 						/>

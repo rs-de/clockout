@@ -12,7 +12,7 @@ export interface DocumentProps {
 	lang?: Lang
 }
 
-const DEFAULT_TITLE = readAppDisplayName("Clockout")
+const DEFAULT_TITLE = readAppDisplayName("ClockOut")
 
 // Order matches the app.css tokens that depend on them (border-size,
 // spacing, duration, font, z-index) — see the comment above their <link> use.
