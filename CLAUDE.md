@@ -36,6 +36,7 @@ pnpm test:unit      # unit tests (Node built-in runner)
 pnpm test:e2e       # Playwright e2e suite (tests/e2e.spec.ts)
 pnpm typecheck      # tsc --noEmit
 pnpm check          # Biome lint + format (auto-fix)
+pnpm release:patch  # bump/commit/tag/push -> triggers the deploy pipeline
 ```
 
 ## Stack

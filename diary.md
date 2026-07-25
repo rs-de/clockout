@@ -236,3 +236,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 77. Replace scaffold README with an actual description of ClockOut
     `(edit README.md: features, pnpm commands, real layout, deploy)`
+
+78. Add release:patch/minor/major scripts to trigger the deploy tag
+    `(edit package.json/README.md/CLAUDE.md: pnpm version + push + tags)`

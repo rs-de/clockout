@@ -54,8 +54,11 @@ pnpm check          # Biome lint + format + i18n check (auto-fix)
 Single Fly.io host with a persistent volume for the sync store (no managed
 database — the store is schemaless files). `.github/workflows/deploy.yml`
 gates a deploy on typecheck/lint/i18n-check/unit tests, then runs on every
-`v*` tag:
+`v*` tag. Cut a release with:
 
 ```sh
-git tag v0.1.0 && git push origin v0.1.0
+pnpm release:patch   # or release:minor / release:major
 ```
+
+Bumps `package.json`'s version, commits, tags, and pushes both — the tag
+is what triggers the pipeline above.
