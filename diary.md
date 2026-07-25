@@ -212,3 +212,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 69. Input validation audit: password strength, sync payload/body size caps
     `(edit app.tsx: minLength=8 on setup password; sync/controller.tsx: caps)`
+
+70. Drop dev source maps entirely — unbundled output needs them least
+    `(edit assets.ts: remove sourceMaps option + fetchAsset wrapper)`

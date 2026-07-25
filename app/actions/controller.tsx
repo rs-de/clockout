@@ -1,6 +1,6 @@
 import { createController } from "remix/router"
 
-import { fetchAsset } from "../assets.ts"
+import { assetServer } from "../assets.ts"
 import { routes } from "../routes.ts"
 import { AboutPage } from "../ui/about.tsx"
 import { App } from "../ui/app.tsx"
@@ -11,14 +11,14 @@ export default createController(routes, {
 	actions: {
 		async assets(context) {
 			return (
-				(await fetchAsset(context.request)) ??
+				(await assetServer.fetch(context.request)) ??
 				new Response("Not Found", { status: 404 })
 			)
 		},
 		async sw(context) {
 			const url = new URL("/assets/app/assets/sw.ts", context.request.url)
 			return (
-				(await fetchAsset(new Request(url.toString()))) ??
+				(await assetServer.fetch(new Request(url.toString()))) ??
 				new Response("Not Found", { status: 404 })
 			)
 		},
