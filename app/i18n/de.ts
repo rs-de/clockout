@@ -52,8 +52,8 @@ export const de: Record<string, string> = {
 	"Syncing...": "Synchronisiere ...",
 	'Tap Share ⬆ then "Add to Home Screen"':
 		'Tippe auf Teilen ⬆, dann auf "Zum Home-Bildschirm"',
-	'Tap ••• then Share, then "Add to Home Screen"':
-		'Tippe auf •••, dann auf Teilen, dann auf "Zum Home-Bildschirm"',
+	'Tap ••• then Share ⬆, then "Add to Home Screen"':
+		'Tippe auf •••, dann auf Teilen ⬆, dann auf "Zum Home-Bildschirm"',
 	"This browser doesn't have local data for this link.":
 		"Dieser Browser hat keine lokalen Daten für diesen Link.",
 	Today: "Heute",

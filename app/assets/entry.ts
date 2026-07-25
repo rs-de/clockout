@@ -165,8 +165,8 @@ if (hasDocument && !localStorage.getItem("co-install-prompted")) {
 			showBanner(
 				"co-install-banner",
 				isIOSSafari
-					? t('Tap Share ⬆ then "Add to Home Screen"')
-					: t('Tap ••• then Share, then "Add to Home Screen"'),
+					? t('Tap ••• then Share ⬆, then "Add to Home Screen"')
+					: t('Tap Share ⬆ then "Add to Home Screen"'),
 				{ durationMs: 8000 },
 			)
 		} else {
