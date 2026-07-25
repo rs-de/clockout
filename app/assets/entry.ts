@@ -150,6 +150,11 @@ const hasDocument = /^\/d\//.test(window.location.pathname)
 
 if (hasDocument && !localStorage.getItem("co-install-prompted")) {
 	const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+	// Chrome/Firefox/Edge on iOS all report "iPhone" too (WebKit is
+	// mandatory there), but tuck Share behind their own ••• menu instead of
+	// exposing it directly in the toolbar like Safari does.
+	const isIOSSafari =
+		isIOS && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(navigator.userAgent)
 	const isStandalone =
 		(navigator as Navigator & { standalone?: boolean }).standalone === true ||
 		window.matchMedia("(display-mode: standalone)").matches
@@ -159,7 +164,9 @@ if (hasDocument && !localStorage.getItem("co-install-prompted")) {
 			localStorage.setItem("co-install-prompted", "1")
 			showBanner(
 				"co-install-banner",
-				t('Tap Share ⬆ then "Add to Home Screen"'),
+				isIOSSafari
+					? t('Tap Share ⬆ then "Add to Home Screen"')
+					: t('Tap ••• then Share, then "Add to Home Screen"'),
 				{ durationMs: 8000 },
 			)
 		} else {
