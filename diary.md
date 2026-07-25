@@ -233,3 +233,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 76. Add tag-triggered deploy pipeline (site default recipe, no DB/Prisma step)
     `(add .github/workflows/deploy.yml; edit .dockerignore)`
+
+77. Replace scaffold README with an actual description of ClockOut
+    `(edit README.md: features, pnpm commands, real layout, deploy)`
