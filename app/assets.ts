@@ -76,6 +76,17 @@ export const assetServer = createAssetServer({
  * failed request. Dev-only: this whole helper is a no-op in production.
  */
 async function fixSourceMapResponse(response: Response): Promise<Response> {
+	// Null-body statuses (a conditional GET revalidating to 304 is the one
+	// that actually happens here) can't carry a body at all per the Fetch
+	// spec — the Response constructor throws if you hand it one along with
+	// one of these statuses. Nothing to fix on an empty body anyway.
+	if (
+		response.status === 304 ||
+		response.status === 204 ||
+		response.status === 205
+	) {
+		return response
+	}
 	const text = await response.text()
 	const init = {
 		status: response.status,
