@@ -215,3 +215,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 70. Source maps: tried dropping entirely, reverted (broke @remix-run/ui maps)
     `(assets.ts: keep sourceMaps on, keep the fixed fetchAsset wrapper)`
+
+71. SW: never intercept .map requests — real root cause of lingering errors
+    `(edit sw.ts: return early on url.pathname.endsWith(".map"))`

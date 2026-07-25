@@ -40,6 +40,15 @@ self.addEventListener("fetch", (event) => {
 
 	const url = new URL(request.url)
 
+	// Source-map requests are devtools-internal, not something the app or a
+	// user ever waits on — and re-issuing them through fetch() inside a
+	// service worker has been unreliable in practice (Safari in particular),
+	// synthesizing this file's own "Offline" 503 fallback for a request that
+	// was never actually offline. Skip interception entirely: not calling
+	// respondWith() lets the browser handle the request on its own, same as
+	// if this listener didn't exist for it.
+	if (url.pathname.endsWith(".map")) return
+
 	const isStaticAsset =
 		url.pathname.startsWith("/icons/") ||
 		url.pathname === "/logo.svg" ||
