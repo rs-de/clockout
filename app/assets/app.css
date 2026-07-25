@@ -705,7 +705,12 @@ select:disabled {
 	min-width: 3.5rem;
 	min-height: 2.75rem;
 	cursor: pointer;
-	border: none;
+	/* .btn-primary and .toggle-button both override this with their own
+	   border, but the plain (secondary-action) variant needs one of its own
+	   — without it, its near-white slate-2 background is nearly
+	   indistinguishable from .form-card's own background. */
+	border: var(--border-size-1) solid hsl(var(--slate-7));
+	color: hsl(var(--slate-12));
 	font-family: inherit;
 	font-size: 1rem;
 	line-height: 1;
@@ -713,6 +718,10 @@ select:disabled {
 	transition:
 		border-color var(--duration-moderate-1),
 		opacity var(--duration-moderate-1);
+}
+
+.btn:hover:not(:disabled) {
+	border-color: hsl(var(--slate-8));
 }
 
 .btn:disabled {
