@@ -275,6 +275,14 @@ export const App = clientEntry(
 		}
 
 		async function handleSetupSubmit(formData: FormData, id: string) {
+			// Show progress immediately, before any async work — otherwise the
+			// form stays fully interactive through several awaits (including
+			// PBKDF2 key derivation), long enough that a quick tap on Share
+			// could still capture "/" as the install target instead of the
+			// /d/:id this all ends up navigating to.
+			view = { kind: "loading" }
+			handle.update()
+
 			const password = String(formData.get("password") ?? "")
 			const data = createTrackingData(
 				{
@@ -291,11 +299,6 @@ export const App = clientEntry(
 			await saveTrackingData(data)
 			sessionKey = await deriveTrackingKey(password)
 			await saveSyncKey(sessionKey)
-
-			// Show progress instead of a frozen form while the first sync push
-			// and the password-manager prompt (both below) are awaited.
-			view = { kind: "loading" }
-			handle.update()
 
 			await Promise.all([
 				// Bounded: a real navigation kills any pending fetch anyway once
@@ -316,6 +319,9 @@ export const App = clientEntry(
 		}
 
 		async function handleUnlockSubmit(id: string, unlockPassword: string) {
+			view = { kind: "loading" }
+			handle.update()
+
 			const response = await fetch(`/sync/${encodeURIComponent(id)}`)
 			if (!response.ok) {
 				view = { kind: "unlock", id, error: t("No data found for this link.") }
