@@ -464,10 +464,16 @@ select:disabled {
 .time-stat {
 	margin: 0;
 	font-family: ui-monospace, monospace;
+	/* Longer-language labels (e.g. German "Verbleibend heute: ...") must
+	   still fit on one line at this size — wrapping mid-duration ("9h" /
+	   "55m" split across lines) reads as broken, not just cramped. */
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .time-stat--day {
-	font-size: 1.75rem;
+	font-size: 1.5rem;
 	font-weight: var(--font-weight-7);
 	color: hsl(var(--primary-11));
 }
@@ -502,12 +508,26 @@ select:disabled {
 
 .week-list > li.data-row {
 	display: flex;
+	align-items: center;
 	justify-content: space-between;
+	gap: 0.5rem;
 	padding: 0.625rem 0.875rem;
 	border-radius: 0.5rem;
 	background: hsl(var(--slate-2));
 	color: hsl(var(--slate-12));
 	font-size: 0.9375rem;
+}
+
+.today-chip {
+	flex-shrink: 0;
+	background: hsl(var(--primary-9));
+	color: #fff;
+	font-size: 0.6875rem;
+	font-weight: var(--font-weight-7);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	padding: 0.1875rem 0.5rem;
+	border-radius: 999px;
 }
 
 /* ── About ──────────────────────────────────────────────── */

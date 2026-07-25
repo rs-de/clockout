@@ -64,7 +64,7 @@ describe("buildExampleData", () => {
 		const data = buildExampleData(example, new Date(2026, 6, 15, 14, 0))
 
 		assert.equal(data.id, "example-lunch-break")
-		assert.equal(data.events.length, 3)
+		assert.equal(data.events.length, 7)
 	})
 
 	test("steady-week's history lands in the same real week regardless of which real weekday it's built on", () => {

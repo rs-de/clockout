@@ -41,6 +41,7 @@ export const de: Record<string, string> = {
 	"Syncing...": "Synchronisiere ...",
 	"This browser doesn't have local data for this link.":
 		"Dieser Browser hat keine lokalen Daten für diesen Link.",
+	Today: "Heute",
 	Unlock: "Entsperren",
 	"Used to calculate how much time you have left this week.":
 		"Wird verwendet, um die verbleibende Zeit einer Woche zu berechnen.",

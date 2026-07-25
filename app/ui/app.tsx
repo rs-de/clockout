@@ -30,6 +30,7 @@ import {
 	type DateFormat,
 	formatDuration,
 	resolveCatchup,
+	startOfDay,
 	summarize,
 	type TrackingData,
 	toggleTracking,
@@ -611,6 +612,8 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 		const entryDayIndex = new Map(entryDays.map((day, i) => [day.getTime(), i]))
 		const summary = summarize(data, now)
 
+		const today = startOfDay(now).getTime()
+
 		const weekList = weeklyBreakdown(data.events, now).map(
 			({ day, workedSec }) => {
 				const label = `${formatWeekdayName(day, data.settings.dateFormat, "short")}, ${formatDayMonth(day, data.settings.dateFormat)}`
@@ -619,7 +622,12 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 				if (i === undefined) {
 					return (
 						<li key={day.getTime()} className="data-row">
-							{label}: {formatDuration(workedSec)}
+							<span>
+								{label}: {formatDuration(workedSec)}
+							</span>
+							{day.getTime() === today && (
+								<span class="today-chip">{t("Today")}</span>
+							)}
 						</li>
 					)
 				}
@@ -717,24 +725,6 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 						</p>
 					)}
 				</div>
-				{
-					// A dangling start from an earlier day (not today) has nothing
-					// live to "stop" — closing it here would just slap a "stop" on
-					// it at whatever moment this button happens to get clicked,
-					// silently collapsing the whole unresolved gap (including any
-					// still-dangling weekend) into one bogus multi-day session.
-					// Only the catch-up form above can close it correctly, per day.
-					!(summary.isRunning && summary.startedAt === null) && (
-						<button
-							type="button"
-							className="toggle-button"
-							mix={on("click", onToggle)}
-							data-running={summary.isRunning}
-						>
-							{summary.isRunning ? t("Stop") : t("Start")}
-						</button>
-					)
-				}
 				{entryDays.length > 0 ? (
 					<form
 						class="catchup-form"
@@ -756,6 +746,24 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 				) : (
 					<ul class="week-list">{weekList}</ul>
 				)}
+				{
+					// A dangling start from an earlier day (not today) has nothing
+					// live to "stop" — closing it here would just slap a "stop" on
+					// it at whatever moment this button happens to get clicked,
+					// silently collapsing the whole unresolved gap (including any
+					// still-dangling weekend) into one bogus multi-day session.
+					// Only the catch-up form above can close it correctly, per day.
+					!(summary.isRunning && summary.startedAt === null) && (
+						<button
+							type="button"
+							className="toggle-button"
+							mix={on("click", onToggle)}
+							data-running={summary.isRunning}
+						>
+							{summary.isRunning ? t("Stop") : t("Start")}
+						</button>
+					)
+				}
 				{footer}
 			</div>
 		)

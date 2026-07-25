@@ -57,6 +57,10 @@ export const EXAMPLES: Example[] = [
 		pretendWeekday: 2, // Wednesday
 		pretendTime: "15:00",
 		events: [
+			{ daysAgo: 2, time: "09:00", type: "start" }, // Monday, 8h
+			{ daysAgo: 2, time: "17:00", type: "stop" },
+			{ daysAgo: 1, time: "09:00", type: "start" }, // Tuesday, 8h
+			{ daysAgo: 1, time: "17:00", type: "stop" },
 			{ daysAgo: 0, time: "09:00", type: "start" },
 			{ daysAgo: 0, time: "12:00", type: "stop" },
 			{ daysAgo: 0, time: "13:00", type: "start" },

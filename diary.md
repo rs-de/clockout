@@ -188,3 +188,12 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 61. Stop @import-chaining Open Props CSS; link all 6 files in parallel
     `(edit app.css/document.tsx: 5 <link> tags before app.css, same order)`
+
+62. Lunch break example: add a full Monday+Tuesday (16h) before the demo day
+    `(edit examples.ts: 2 start/stop pairs; fix event-count test)`
+
+63. Right-aligned "Today" chip on the week-list row matching the current day
+    `(edit app.tsx/app.css/de.ts: today-chip span, startOfDay comparison)`
+
+64. Move Start/Stop (and Save hours) to the bottom of the screen for thumb reach
+    `(edit app.tsx: TrackingScreen renders week-list/catchup-form before button)`
