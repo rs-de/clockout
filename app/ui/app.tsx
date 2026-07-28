@@ -1,11 +1,7 @@
 import { nanoid } from "nanoid"
-import { clientEntry, type Handle, on, type RemixNode, ref } from "remix/ui"
+import { clientEntry, type Handle, on, type RemixNode } from "remix/ui"
 
-import {
-	formatClockTime,
-	formatDayMonth,
-	formatWeekdayName,
-} from "../utils/date-format.ts"
+import { formatClockTime, formatWeekdayName } from "../utils/date-format.ts"
 import {
 	buildExampleData,
 	type Example,
@@ -26,17 +22,17 @@ import {
 } from "../utils/local-store.ts"
 import { createSyncEngine, type SyncStatus } from "../utils/sync-engine.ts"
 import {
+	type Block,
+	blockDurationSec,
+	bookDay,
 	createTrackingData,
 	type DateFormat,
-	editDay,
 	formatDuration,
-	resolveCatchup,
-	startOfDay,
+	setBlockField,
+	startBlock,
+	stopBlock,
 	summarize,
 	type TrackingData,
-	toggleTracking,
-	weeklyBreakdown,
-	weeklyEntryDays,
 } from "../utils/time-tracking.ts"
 import {
 	decryptTrackingData,
@@ -57,8 +53,8 @@ type View =
 	// landing page, not the tracking screen — it only links to the
 	// bookmarkable /d/:id, which is where "tracking" actually renders.
 	| { kind: "home"; data: TrackingData }
-	// Editing the global weekly target / daily max / date format for an
-	// existing doc — reached from "home", returns there on save or cancel.
+	// Editing the global daily minimum/max/date format for an existing doc —
+	// reached from "home", returns there on save or cancel.
 	| { kind: "settings"; data: TrackingData }
 	| { kind: "tracking"; data: TrackingData }
 	// In-memory only — see app/utils/examples.ts. `offsetMs` is the fixed
@@ -84,8 +80,8 @@ function readExampleIdFromUrl(): string | null {
  * before the submit event even fires). This guards the one path that
  * bypasses that: FormData built or edited outside the real form (devtools,
  * a future regression). Without it, a non-numeric field yields `NaN`,
- * which would get permanently written into persisted settings or an
- * "adjust" event and poison every total that reads it from then on.
+ * which would get permanently written into persisted settings or a
+ * booking, poisoning every total that reads it from then on.
  */
 function readMinutes(
 	formData: FormData,
@@ -98,24 +94,25 @@ function readMinutes(
 	return hours * 60 + minutes
 }
 
-function readCatchupSkip(formData: FormData, i: number): boolean {
-	return formData.get(`day-${i}-skip`) === "on"
+/** `null` renders as an empty `<input type="time">`. */
+function timeInputValue(sec: number | null): string {
+	if (sec === null) return ""
+	const d = new Date(sec * 1000)
+	return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
 }
 
-/** The "did not work" checkbox always wins over whatever's left in the hour/minute fields. */
-function readCatchupMinutes(formData: FormData, i: number): number {
-	if (readCatchupSkip(formData, i)) return 0
-	return readMinutes(formData, `day-${i}-hours`, `day-${i}-minutes`)
-}
-
-function toggleCatchupDayFields(
-	fieldset: HTMLFieldSetElement | null,
-	disabled: boolean,
-) {
-	if (!fieldset) return
-	for (const input of fieldset.querySelectorAll("input[type=number]")) {
-		;(input as HTMLInputElement).disabled = disabled
-	}
+/**
+ * Resolves an `<input type="time">`'s `"HH:MM"` value against `nowSec`'s
+ * calendar day — blocks are always today's (requirement #7 drops the old
+ * per-day catch-up flow entirely), so there's no other day to anchor to. An
+ * empty value (the field was cleared) resolves to `null`, unsetting the field.
+ */
+function parseTimeInput(value: string, nowSec: number): number | null {
+	if (!value) return null
+	const [hours, minutes] = value.split(":").map(Number)
+	const d = new Date(nowSec * 1000)
+	d.setHours(hours ?? 0, minutes ?? 0, 0, 0)
+	return Math.floor(d.getTime() / 1000)
 }
 
 function buildExampleView(example: Example): View {
@@ -259,8 +256,9 @@ export const App = clientEntry(
 
 		handle.queueTask((signal) => resolveView(signal))
 
-		// Keeps the always-visible remaining time live. Browser-only: on the server
-		// this timer would outlive the one-shot SSR render and crash the process.
+		// Keeps the always-visible quitting-time estimate live. Browser-only: on
+		// the server this timer would outlive the one-shot SSR render and crash
+		// the process.
 		if (typeof window !== "undefined") {
 			const interval = setInterval(() => handle.update(), 1000)
 			handle.signal.addEventListener("abort", () => clearInterval(interval))
@@ -289,12 +287,12 @@ export const App = clientEntry(
 			const password = String(formData.get("password") ?? "")
 			const data = createTrackingData(
 				{
-					weeklyTargetMin: readMinutes(
+					dailyMinimum: readMinutes(
 						formData,
-						"weeklyHours",
-						"weeklyMinutes",
+						"dailyMinHours",
+						"dailyMinMinutes",
 					),
-					dailyMax: readMinutes(formData, "dailyHours", "dailyMinutes"),
+					dailyMax: readMinutes(formData, "dailyMaxHours", "dailyMaxMinutes"),
 					dateFormat: (formData.get("dateFormat") as DateFormat | null) ?? "de",
 				},
 				id,
@@ -307,8 +305,8 @@ export const App = clientEntry(
 				// Bounded: a real navigation kills any pending fetch anyway once
 				// we leave, so don't let a hung request hold up setup
 				// indefinitely. If the push hasn't landed by then, the next
-				// Start/Stop toggle (or catch-up edit) retries it the same as
-				// any other interrupted sync.
+				// Start/Stop/Buchen action retries it the same as any other
+				// interrupted sync.
 				Promise.race([syncEngine.sync(data, sessionKey), delay(2000)]),
 				storePasswordCredential(data.id, password),
 			])
@@ -357,8 +355,8 @@ export const App = clientEntry(
 			formData: FormData,
 		) {
 			data.settings = {
-				weeklyTargetMin: readMinutes(formData, "weeklyHours", "weeklyMinutes"),
-				dailyMax: readMinutes(formData, "dailyHours", "dailyMinutes"),
+				dailyMinimum: readMinutes(formData, "dailyMinHours", "dailyMinMinutes"),
+				dailyMax: readMinutes(formData, "dailyMaxHours", "dailyMaxMinutes"),
 				dateFormat: (formData.get("dateFormat") as DateFormat | null) ?? "de",
 			}
 			await saveTrackingData(data)
@@ -367,40 +365,36 @@ export const App = clientEntry(
 			if (sessionKey) void syncEngine.sync(data, sessionKey)
 		}
 
-		async function handleCatchupSubmit(
-			data: TrackingData,
-			days: Date[],
-			formData: FormData,
-		) {
-			const workedMinutesPerDay = days.map((_, i) =>
-				readCatchupMinutes(formData, i),
-			)
-			const skipDayFlags = days.map((_, i) => readCatchupSkip(formData, i))
-			data.events = resolveCatchup(
-				data.events,
-				days,
-				workedMinutesPerDay,
-				skipDayFlags,
-			)
+		async function handleStart(data: TrackingData) {
+			data.blocks = startBlock(data.blocks, Math.floor(Date.now() / 1000))
 			await saveTrackingData(data)
 			handle.update()
 			if (sessionKey) void syncEngine.sync(data, sessionKey)
 		}
 
-		async function handleToggle(data: TrackingData) {
-			data.events = toggleTracking(data.events, Math.floor(Date.now() / 1000))
+		async function handleStop(data: TrackingData) {
+			data.blocks = stopBlock(data.blocks, Math.floor(Date.now() / 1000))
 			await saveTrackingData(data)
 			handle.update()
 			if (sessionKey) void syncEngine.sync(data, sessionKey)
 		}
 
-		async function handleEditDay(
+		async function handleBlockFieldChange(
 			data: TrackingData,
-			day: Date,
-			minutes: number,
-			currentWorkedSec: number,
+			index: number,
+			field: "start" | "end",
+			value: number | null,
 		) {
-			data.events = editDay(data.events, day, minutes, currentWorkedSec)
+			data.blocks = setBlockField(data.blocks, index, field, value)
+			await saveTrackingData(data)
+			handle.update()
+			if (sessionKey) void syncEngine.sync(data, sessionKey)
+		}
+
+		async function handleBookDay(data: TrackingData, bookingSec: number) {
+			const booked = bookDay(data, bookingSec, Math.floor(Date.now() / 1000))
+			data.blocks = booked.blocks
+			data.bookings = booked.bookings
 			await saveTrackingData(data)
 			handle.update()
 			if (sessionKey) void syncEngine.sync(data, sessionKey)
@@ -409,39 +403,34 @@ export const App = clientEntry(
 		// Example handlers mirror the real ones above but stay in-memory only —
 		// no saveTrackingData, no syncToServer — since example data is strictly
 		// throwaway (see app/utils/examples.ts).
-		function handleExampleToggle(data: TrackingData, now: Date) {
-			data.events = toggleTracking(
-				data.events,
-				Math.floor(now.getTime() / 1000),
-			)
+		function handleExampleStart(data: TrackingData, now: Date) {
+			data.blocks = startBlock(data.blocks, Math.floor(now.getTime() / 1000))
 			handle.update()
 		}
 
-		function handleExampleCatchupSubmit(
-			data: TrackingData,
-			days: Date[],
-			formData: FormData,
-		) {
-			const workedMinutesPerDay = days.map((_, i) =>
-				readCatchupMinutes(formData, i),
-			)
-			const skipDayFlags = days.map((_, i) => readCatchupSkip(formData, i))
-			data.events = resolveCatchup(
-				data.events,
-				days,
-				workedMinutesPerDay,
-				skipDayFlags,
-			)
+		function handleExampleStop(data: TrackingData, now: Date) {
+			data.blocks = stopBlock(data.blocks, Math.floor(now.getTime() / 1000))
 			handle.update()
 		}
 
-		function handleExampleEditDay(
+		function handleExampleBlockFieldChange(
 			data: TrackingData,
-			day: Date,
-			minutes: number,
-			currentWorkedSec: number,
+			index: number,
+			field: "start" | "end",
+			value: number | null,
 		) {
-			data.events = editDay(data.events, day, minutes, currentWorkedSec)
+			data.blocks = setBlockField(data.blocks, index, field, value)
+			handle.update()
+		}
+
+		function handleExampleBookDay(
+			data: TrackingData,
+			bookingSec: number,
+			now: Date,
+		) {
+			const booked = bookDay(data, bookingSec, Math.floor(now.getTime() / 1000))
+			data.blocks = booked.blocks
+			data.bookings = booked.bookings
 			handle.update()
 		}
 
@@ -576,16 +565,16 @@ export const App = clientEntry(
 						</label>
 
 						<fieldset>
-							<legend>{t("Weekly target")}</legend>
+							<legend>{t("Daily minimum")}</legend>
 							<div class="hm-row">
 								<input
-									name="weeklyHours"
+									name="dailyMinHours"
 									type="number"
 									inputmode="numeric"
 									min="0"
-									max="168"
-									defaultValue="35"
-									aria-label={`${t("Weekly target")} ${t("h")}`}
+									max="23"
+									defaultValue="7"
+									aria-label={`${t("Daily minimum")} ${t("h")}`}
 									mix={[
 										on("focus", (event) => selectOnFocus(event.currentTarget)),
 										on("mouseup", (event) =>
@@ -597,13 +586,13 @@ export const App = clientEntry(
 									{t("h")}
 								</span>
 								<input
-									name="weeklyMinutes"
+									name="dailyMinMinutes"
 									type="number"
 									inputmode="numeric"
 									min="0"
 									max="59"
 									defaultValue="0"
-									aria-label={`${t("Weekly target")} ${t("m")}`}
+									aria-label={`${t("Daily minimum")} ${t("m")}`}
 									mix={[
 										on("focus", (event) => selectOnFocus(event.currentTarget)),
 										on("mouseup", (event) =>
@@ -616,7 +605,7 @@ export const App = clientEntry(
 								</span>
 							</div>
 							<p class="field-hint">
-								{t("Used to calculate how much time you have left this week.")}
+								{t("Used to calculate your quitting time and depot credit.")}
 							</p>
 						</fieldset>
 
@@ -624,7 +613,7 @@ export const App = clientEntry(
 							<legend>{t("Daily max")}</legend>
 							<div class="hm-row">
 								<input
-									name="dailyHours"
+									name="dailyMaxHours"
 									type="number"
 									inputmode="numeric"
 									min="0"
@@ -642,7 +631,7 @@ export const App = clientEntry(
 									{t("h")}
 								</span>
 								<input
-									name="dailyMinutes"
+									name="dailyMaxMinutes"
 									type="number"
 									inputmode="numeric"
 									min="0"
@@ -661,7 +650,9 @@ export const App = clientEntry(
 								</span>
 							</div>
 							<p class="field-hint">
-								{t("Used to calculate how much time you have left today.")}
+								{t(
+									"The most that can be booked in one day — extra time still credits the depot.",
+								)}
 							</p>
 						</fieldset>
 
@@ -710,10 +701,10 @@ export const App = clientEntry(
 
 			if (view.kind === "settings") {
 				const { data } = view
-				const weeklyHours = Math.floor(data.settings.weeklyTargetMin / 60)
-				const weeklyMinutes = data.settings.weeklyTargetMin % 60
-				const dailyHours = Math.floor(data.settings.dailyMax / 60)
-				const dailyMinutes = data.settings.dailyMax % 60
+				const dailyMinHours = Math.floor(data.settings.dailyMinimum / 60)
+				const dailyMinMinutes = data.settings.dailyMinimum % 60
+				const dailyMaxHours = Math.floor(data.settings.dailyMax / 60)
+				const dailyMaxMinutes = data.settings.dailyMax % 60
 
 				return (
 					<form
@@ -726,16 +717,16 @@ export const App = clientEntry(
 						<h1>{t("Settings")}</h1>
 
 						<fieldset>
-							<legend>{t("Weekly target")}</legend>
+							<legend>{t("Daily minimum")}</legend>
 							<div class="hm-row">
 								<input
-									name="weeklyHours"
+									name="dailyMinHours"
 									type="number"
 									inputmode="numeric"
 									min="0"
-									max="168"
-									defaultValue={String(weeklyHours)}
-									aria-label={`${t("Weekly target")} ${t("h")}`}
+									max="23"
+									defaultValue={String(dailyMinHours)}
+									aria-label={`${t("Daily minimum")} ${t("h")}`}
 									mix={[
 										on("focus", (event) => selectOnFocus(event.currentTarget)),
 										on("mouseup", (event) =>
@@ -747,13 +738,13 @@ export const App = clientEntry(
 									{t("h")}
 								</span>
 								<input
-									name="weeklyMinutes"
+									name="dailyMinMinutes"
 									type="number"
 									inputmode="numeric"
 									min="0"
 									max="59"
-									defaultValue={String(weeklyMinutes)}
-									aria-label={`${t("Weekly target")} ${t("m")}`}
+									defaultValue={String(dailyMinMinutes)}
+									aria-label={`${t("Daily minimum")} ${t("m")}`}
 									mix={[
 										on("focus", (event) => selectOnFocus(event.currentTarget)),
 										on("mouseup", (event) =>
@@ -766,7 +757,7 @@ export const App = clientEntry(
 								</span>
 							</div>
 							<p class="field-hint">
-								{t("Used to calculate how much time you have left this week.")}
+								{t("Used to calculate your quitting time and depot credit.")}
 							</p>
 						</fieldset>
 
@@ -774,12 +765,12 @@ export const App = clientEntry(
 							<legend>{t("Daily max")}</legend>
 							<div class="hm-row">
 								<input
-									name="dailyHours"
+									name="dailyMaxHours"
 									type="number"
 									inputmode="numeric"
 									min="0"
 									max="23"
-									defaultValue={String(dailyHours)}
+									defaultValue={String(dailyMaxHours)}
 									aria-label={`${t("Daily max")} ${t("h")}`}
 									mix={[
 										on("focus", (event) => selectOnFocus(event.currentTarget)),
@@ -792,12 +783,12 @@ export const App = clientEntry(
 									{t("h")}
 								</span>
 								<input
-									name="dailyMinutes"
+									name="dailyMaxMinutes"
 									type="number"
 									inputmode="numeric"
 									min="0"
 									max="59"
-									defaultValue={String(dailyMinutes)}
+									defaultValue={String(dailyMaxMinutes)}
 									aria-label={`${t("Daily max")} ${t("m")}`}
 									mix={[
 										on("focus", (event) => selectOnFocus(event.currentTarget)),
@@ -811,7 +802,9 @@ export const App = clientEntry(
 								</span>
 							</div>
 							<p class="field-hint">
-								{t("Used to calculate how much time you have left today.")}
+								{t(
+									"The most that can be booked in one day — extra time still credits the depot.",
+								)}
 							</p>
 						</fieldset>
 
@@ -855,13 +848,12 @@ export const App = clientEntry(
 					<TrackingScreen
 						data={data}
 						now={new Date()}
-						onToggle={() => void handleToggle(data)}
-						onCatchupSubmit={(days, formData) =>
-							void handleCatchupSubmit(data, days, formData)
+						onStart={() => void handleStart(data)}
+						onStop={() => void handleStop(data)}
+						onBlockFieldChange={(index, field, value) =>
+							void handleBlockFieldChange(data, index, field, value)
 						}
-						onEditDay={(day, minutes, currentWorkedSec) =>
-							void handleEditDay(data, day, minutes, currentWorkedSec)
-						}
+						onBookDay={(bookingSec) => void handleBookDay(data, bookingSec)}
 						t={t}
 						footer={
 							syncStatusLabel(syncEngine.getStatus(), t) && (
@@ -885,12 +877,13 @@ export const App = clientEntry(
 				<TrackingScreen
 					data={data}
 					now={now}
-					onToggle={() => handleExampleToggle(data, now)}
-					onCatchupSubmit={(days, formData) =>
-						handleExampleCatchupSubmit(data, days, formData)
+					onStart={() => handleExampleStart(data, now)}
+					onStop={() => handleExampleStop(data, now)}
+					onBlockFieldChange={(index, field, value) =>
+						handleExampleBlockFieldChange(data, index, field, value)
 					}
-					onEditDay={(day, minutes, currentWorkedSec) =>
-						handleExampleEditDay(data, day, minutes, currentWorkedSec)
+					onBookDay={(bookingSec) =>
+						handleExampleBookDay(data, bookingSec, now)
 					}
 					t={t}
 					banner={
@@ -911,339 +904,162 @@ export const App = clientEntry(
 type TrackingScreenProps = {
 	data: TrackingData
 	now: Date
-	onToggle: () => void
-	onCatchupSubmit: (days: Date[], formData: FormData) => void
-	onEditDay: (day: Date, minutes: number, currentWorkedSec: number) => void
+	onStart: () => void
+	onStop: () => void
+	onBlockFieldChange: (
+		index: number,
+		field: "start" | "end",
+		value: number | null,
+	) => void
+	onBookDay: (bookingSec: number) => void
 	t: Translator
 	banner?: RemixNode
 	footer?: RemixNode
 }
 
-const EDIT_DAY_FORM_ID = "edit-day-form"
-
 function TrackingScreen(handle: Handle<TrackingScreenProps>) {
-	// Which day's row (by day.getTime()) is currently showing its inline
-	// edit form, if any. Local UI state, not app data — reset once a save
-	// (or a submit for a *different* day) goes through.
-	let editingDayTime: number | null = null
-
 	return () => {
 		const {
 			data,
 			now,
-			onToggle,
-			onCatchupSubmit,
-			onEditDay,
+			onStart,
+			onStop,
+			onBlockFieldChange,
+			onBookDay,
 			t,
 			banner,
 			footer,
 		} = handle.props
-		const entryDays = weeklyEntryDays(data.events, now)
-		const entryDayIndex = new Map(entryDays.map((day, i) => [day.getTime(), i]))
+		const nowSec = Math.floor(now.getTime() / 1000)
 		const summary = summarize(data, now)
+		const dateFormat = data.settings.dateFormat
 
-		const today = startOfDay(now).getTime()
-
-		const weekList = weeklyBreakdown(data.events, now).map(
-			({ day, workedSec }) => {
-				const label = `${formatWeekdayName(day, data.settings.dateFormat, "short")}, ${formatDayMonth(day, data.settings.dateFormat)}`
-				const i = entryDayIndex.get(day.getTime())
-
-				if (i === undefined) {
-					const isToday = day.getTime() === today
-
-					if (editingDayTime === day.getTime()) {
-						const totalMinutes = Math.round(workedSec / 60)
-						const hours = Math.floor(totalMinutes / 60)
-						const minutes = totalMinutes % 60
-
-						return (
-							<li key={day.getTime()} className="data-row data-row--editing">
-								<span class="edit-day-label">{label}</span>
-								<div class="hm-row">
-									<input
-										form={EDIT_DAY_FORM_ID}
-										name="hours"
-										type="number"
-										inputmode="numeric"
-										min="0"
-										max="23"
-										defaultValue={String(hours)}
-										aria-label={`${label} ${t("h")}`}
-										mix={[
-											// The native `autofocus` attribute isn't reliably
-											// honored for elements inserted after page load
-											// (Safari in particular) — `ref` fires on real DOM
-											// insertion instead, so this consistently focuses
-											// the field the moment edit mode opens, raising the
-											// mobile keyboard immediately. Calls selectOnFocus
-											// directly rather than relying on the "focus" mixin
-											// below to catch this: that listener isn't attached
-											// yet at the instant .focus() synchronously fires
-											// the native focus event, so the very first,
-											// programmatic focus would otherwise dispatch with
-											// no listener present to select the value.
-											ref((node) => {
-												node.focus()
-												selectOnFocus(node)
-											}),
-											on("focus", (event) =>
-												selectOnFocus(event.currentTarget),
-											),
-											on("mouseup", (event) =>
-												reassertSelectOnMouseUp(event.currentTarget, event),
-											),
-										]}
-									/>
-									<span class="unit" aria-hidden="true">
-										{t("h")}
-									</span>
-									<input
-										form={EDIT_DAY_FORM_ID}
-										name="minutes"
-										type="number"
-										inputmode="numeric"
-										min="0"
-										max="59"
-										defaultValue={String(minutes)}
-										aria-label={`${label} ${t("m")}`}
-										mix={[
-											on("focus", (event) =>
-												selectOnFocus(event.currentTarget),
-											),
-											on("mouseup", (event) =>
-												reassertSelectOnMouseUp(event.currentTarget, event),
-											),
-										]}
-									/>
-									<span class="unit" aria-hidden="true">
-										{t("m")}
-									</span>
-								</div>
-								<button
-									type="submit"
-									form={EDIT_DAY_FORM_ID}
-									class="edit-day-save"
-									aria-label={`${t("Save")} ${label}`}
-								>
-									<svg
-										viewBox="0 0 24 24"
-										aria-hidden="true"
-										width="16"
-										height="16"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="3"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<path d="M20 6 9 17l-5-5" />
-									</svg>
-								</button>
-							</li>
-						)
-					}
-
-					return (
-						<li key={day.getTime()} className="data-row">
-							<span>
-								{label}: {formatDuration(workedSec)}
-							</span>
-							<span class="data-row__actions">
-								{isToday && <span class="today-chip">{t("Today")}</span>}
-								{!isToday && (
-									<button
-										type="button"
-										class="edit-day-toggle"
-										aria-label={`${t("Edit")} ${label}`}
-										mix={on("click", () => {
-											editingDayTime = day.getTime()
-											handle.update()
-										})}
-									>
-										<svg
-											viewBox="0 0 24 24"
-											aria-hidden="true"
-											width="16"
-											height="16"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<path d="M12 20h9" />
-											<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-										</svg>
-									</button>
-								)}
-							</span>
-						</li>
-					)
-				}
-
-				// A weekend day only ever reaches this pending-entry branch because
-				// its own Friday wasn't stopped, not because the weekend itself is
-				// likely worked — so pre-check "Did not work" for it (Friday stays
-				// unchecked, since that's the day that actually needs real hours).
-				const isWeekend = day.getDay() === 0 || day.getDay() === 6
-
-				return (
-					<li key={day.getTime()}>
-						<fieldset>
-							<legend>{label}</legend>
-							<div class="hm-row">
-								<input
-									name={`day-${i}-hours`}
-									type="number"
-									inputmode="numeric"
-									min="0"
-									max="23"
-									defaultValue="0"
-									disabled={isWeekend}
-									aria-label={`${label} ${t("h")}`}
-									mix={[
-										on("focus", (event) => selectOnFocus(event.currentTarget)),
-										on("mouseup", (event) =>
-											reassertSelectOnMouseUp(event.currentTarget, event),
-										),
-									]}
-								/>
-								<span class="unit" aria-hidden="true">
-									{t("h")}
-								</span>
-								<input
-									name={`day-${i}-minutes`}
-									type="number"
-									inputmode="numeric"
-									min="0"
-									max="59"
-									defaultValue="0"
-									disabled={isWeekend}
-									aria-label={`${label} ${t("m")}`}
-									mix={[
-										on("focus", (event) => selectOnFocus(event.currentTarget)),
-										on("mouseup", (event) =>
-											reassertSelectOnMouseUp(event.currentTarget, event),
-										),
-									]}
-								/>
-								<span class="unit" aria-hidden="true">
-									{t("m")}
-								</span>
-								<label class="catchup-skip">
-									<input
-										name={`day-${i}-skip`}
-										type="checkbox"
-										defaultChecked={isWeekend}
-										mix={on("change", (event) => {
-											toggleCatchupDayFields(
-												event.currentTarget.closest("fieldset"),
-												event.currentTarget.checked,
-											)
-										})}
-									/>
-									{t("Did not work")}
-								</label>
-							</div>
-						</fieldset>
-					</li>
-				)
-			},
-		)
+		const defaultBookingMinutes = Math.round(summary.defaultBookingSec / 60)
+		const defaultBookingHours = Math.floor(defaultBookingMinutes / 60)
+		const defaultBookingRemainderMinutes = defaultBookingMinutes % 60
 
 		return (
 			<div class="time-page">
-				{
-					// A day-edit row's inputs/button bind here via a `form`
-					// attribute instead of wrapping their own <form> — the whole
-					// week-list can already be nested inside .catchup-form (when
-					// entryDays.length > 0), and a <form> can't itself nest inside
-					// another one (the browser silently drops the inner one).
-					// This stays a single, empty, unconditionally-rendered element
-					// so only one day can be mid-edit at a time.
-				}
-				<form
-					id={EDIT_DAY_FORM_ID}
-					mix={on("submit", (event) => {
-						event.preventDefault()
-						if (editingDayTime === null) return
-						const day = new Date(editingDayTime)
-						const currentWorkedSec =
-							weeklyBreakdown(data.events, now).find(
-								(entry) => entry.day.getTime() === editingDayTime,
-							)?.workedSec ?? 0
-						const formData = new FormData(event.currentTarget)
-						const minutes = readMinutes(formData, "hours", "minutes")
-						onEditDay(day, minutes, currentWorkedSec)
-						editingDayTime = null
-						handle.update()
-					})}
-				/>
 				{banner}
 				<div class="time-stats">
-					<p class="time-stat time-stat--day">
-						{t("Day remaining: {duration}", {
-							duration: formatDuration(summary.dailyRemainingSec),
+					<p class="time-stat time-stat--primary">
+						{t("Quitting time: {time}", {
+							time: formatClockTime(
+								new Date(summary.quittingTimeSec * 1000),
+								dateFormat,
+							),
 						})}
 					</p>
-					<p class="time-stat time-stat--week">
-						{t("Week remaining: {duration}", {
-							duration: formatDuration(summary.weeklyRemainingSec),
+					<p class="time-stat time-stat--secondary">
+						{t("Depot: {duration}", {
+							duration: formatDuration(summary.depotSec),
 						})}
 					</p>
-					{summary.startedAt !== null && (
-						<p class="time-started">
-							{t("Started at {time}", {
-								time: formatClockTime(
-									new Date(summary.startedAt * 1000),
-									data.settings.dateFormat,
-								),
-							})}
-						</p>
-					)}
 				</div>
-				{entryDays.length > 0 ? (
-					<form
-						class="catchup-form"
-						mix={on("submit", (event) => {
-							event.preventDefault()
-							onCatchupSubmit(entryDays, new FormData(event.currentTarget))
-						})}
-					>
-						<p class="form-intro">
-							{t(
-								'Some days this week have no tracked hours yet. Enter how many hours you worked, or check "Did not work".',
+				<ul class="block-list">
+					{data.blocks.map((block: Block, i: number) => (
+						<li key={i} class="data-row block-row">
+							<div class="hm-row">
+								<input
+									key={`start-${i}-${block.start ?? "empty"}`}
+									type="time"
+									aria-label={t("Start")}
+									defaultValue={timeInputValue(block.start)}
+									mix={on("change", (event) => {
+										onBlockFieldChange(
+											i,
+											"start",
+											parseTimeInput(event.currentTarget.value, nowSec),
+										)
+									})}
+								/>
+								<span aria-hidden="true">–</span>
+								<input
+									key={`end-${i}-${block.end ?? "empty"}`}
+									type="time"
+									aria-label={t("End")}
+									disabled={block.start === null}
+									defaultValue={timeInputValue(block.end)}
+									mix={on("change", (event) => {
+										onBlockFieldChange(
+											i,
+											"end",
+											parseTimeInput(event.currentTarget.value, nowSec),
+										)
+									})}
+								/>
+							</div>
+							{block.start !== null && block.end !== null && (
+								<span class="block-duration">
+									{formatDuration(blockDurationSec(block, nowSec))}
+								</span>
 							)}
-						</p>
-						<ul class="week-list">{weekList}</ul>
-						<button type="submit" class="btn btn-primary">
-							{t("Save hours")}
-						</button>
-					</form>
-				) : (
-					<ul class="week-list">{weekList}</ul>
-				)}
-				{
-					// Hidden while any day this week still needs a catch-up answer.
-					// This also covers a dangling start from an earlier day (not
-					// today): it has nothing live to "stop", and closing it here
-					// would just slap a "stop" on it at whatever moment this button
-					// happens to get clicked, silently collapsing the whole
-					// unresolved gap (including any still-dangling weekend) into one
-					// bogus multi-day session — only the catch-up form above can
-					// close it correctly, per day.
-					entryDays.length === 0 && (
-						<button
-							type="button"
-							className="toggle-button"
-							mix={on("click", onToggle)}
-							data-running={summary.isRunning}
-						>
-							{summary.isRunning ? t("Stop") : t("Start")}
-						</button>
-					)
-				}
+						</li>
+					))}
+				</ul>
+				<button
+					type="button"
+					className="toggle-button"
+					mix={on("click", summary.isRunning ? onStop : onStart)}
+					data-running={summary.isRunning}
+				>
+					{summary.isRunning ? t("Stop") : t("Start")}
+				</button>
+				<form
+					class="booking-form"
+					mix={on("submit", (event) => {
+						event.preventDefault()
+						const formData = new FormData(event.currentTarget)
+						onBookDay(
+							readMinutes(formData, "bookingHours", "bookingMinutes") * 60,
+						)
+					})}
+				>
+					<fieldset>
+						<legend>{t("Booking time")}</legend>
+						<div class="hm-row">
+							<input
+								name="bookingHours"
+								type="number"
+								inputmode="numeric"
+								min="0"
+								max="23"
+								defaultValue={String(defaultBookingHours)}
+								aria-label={`${t("Booking time")} ${t("h")}`}
+								mix={[
+									on("focus", (event) => selectOnFocus(event.currentTarget)),
+									on("mouseup", (event) =>
+										reassertSelectOnMouseUp(event.currentTarget, event),
+									),
+								]}
+							/>
+							<span class="unit" aria-hidden="true">
+								{t("h")}
+							</span>
+							<input
+								name="bookingMinutes"
+								type="number"
+								inputmode="numeric"
+								min="0"
+								max="59"
+								defaultValue={String(defaultBookingRemainderMinutes)}
+								aria-label={`${t("Booking time")} ${t("m")}`}
+								mix={[
+									on("focus", (event) => selectOnFocus(event.currentTarget)),
+									on("mouseup", (event) =>
+										reassertSelectOnMouseUp(event.currentTarget, event),
+									),
+								]}
+							/>
+							<span class="unit" aria-hidden="true">
+								{t("m")}
+							</span>
+						</div>
+					</fieldset>
+					<button type="submit" class="btn btn-primary">
+						{t("Book")}
+					</button>
+				</form>
 				{footer}
 			</div>
 		)

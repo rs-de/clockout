@@ -6,17 +6,19 @@ export const de: Record<string, string> = {
 	"Add to your homescreen for quick access":
 		"Zum Startbildschirm hinzufügen für schnellen Zugriff",
 	"Back to examples": "Zurück zu den Beispielen",
+	Book: "Buchen",
+	"Booking time": "Buchungszeit",
 	"Browser default": "Browserstandard",
 	Cancel: "Abbrechen",
 	"ClockOut is a lean, private time tracker: clock in, clock out, and see at a glance how much time is left today and this week. No account needed — your data is encrypted in your browser before it's synced, so only you can unlock it. Try one of the example scenarios below to see it in action.":
 		"ClockOut ist eine schlanke, private Zeiterfassung: einstempeln, ausstempeln und auf einen Blick sehen, wie viel Zeit heute und diese Woche noch bleibt. Kein Konto nötig — deine Daten werden im Browser verschlüsselt, bevor sie synchronisiert werden, sodass nur du sie entsperren kannst. Probiere unten eines der Beispiele aus, um sie in Aktion zu sehen.",
 	"Daily max": "Maximale Tagesarbeitszeit",
+	"Daily minimum": "Minimale Tagesarbeitszeit",
 	"Date format": "Datumsformat",
-	"Day remaining: {duration}": "Verbleibend heute: {duration}",
 	'Demo: simulating "{name}" — {dateTime}. Nothing here is saved.':
 		'Demo: Simulation von "{name}" — {dateTime}. Hier wird nichts gespeichert.',
-	"Did not work": "Nicht gearbeitet",
-	Edit: "Bearbeiten",
+	"Depot: {duration}": "Depot: {duration}",
+	End: "Ende",
 	Examples: "Beispiele",
 	"Forgot to stop": "Zu stoppen vergessen",
 	"Forgot to stop on Friday": "Am Freitag zu stoppen vergessen",
@@ -36,18 +38,15 @@ export const de: Record<string, string> = {
 	Password: "Passwort",
 	"Passwords don't match": "Passwörter stimmen nicht überein",
 	Privacy: "Datenschutz",
+	"Quitting time: {time}": "Feierabend ist um {time}",
 	Refresh: "Aktualisieren",
 	"Repeat password": "Passwort wiederholen",
 	Save: "Speichern",
 	"Save and start tracking": "Speichern und los ...",
-	"Save hours": "Stunden speichern",
 	"Set a password to encrypt your data before it's synced online — only you can unlock it. You'll only need to enter it again if your browser cache is cleared or you open the link to your ClockOut on another device. Recommendation: use a password manager!":
 		"Vergib ein Passwort, um deine Daten vor der Online-Synchronisierung zu verschlüsseln — nur du kannst sie entschlüsseln. Du brauchst es nur erneut, wenn der Browser Cache gelöscht wird oder du den Link zu deinem ClockOut auf einem andern Gerät öffnest. Empfehlung: Benutze einen Passwort Manager!",
 	Settings: "Einstellungen",
-	'Some days this week have no tracked hours yet. Enter how many hours you worked, or check "Did not work".':
-		'Für einige Tage dieser Woche sind noch keine Stunden erfasst. Trage ein, wie viele Stunden du gearbeitet hast, oder markiere "Nicht gearbeitet".',
 	Start: "Start",
-	"Started at {time}": "Begonnen um {time}",
 	Stop: "Stopp",
 	"Sync failed (offline?)": "Synchronisierung fehlgeschlagen (offline?)",
 	Synced: "Synchronisiert",
@@ -56,17 +55,14 @@ export const de: Record<string, string> = {
 		'Tippe auf Teilen ⬆, dann auf "Zum Home-Bildschirm"',
 	'Tap ••• then Share ⬆, then "Add to Home Screen"':
 		'Tippe auf •••, dann auf Teilen ⬆, dann auf "Zum Home-Bildschirm"',
+	"The most that can be booked in one day — extra time still credits the depot.":
+		"Das Maximum, das an einem Tag gebucht werden kann — die restliche Zeit fließt trotzdem ins Depot.",
 	"This browser doesn't have local data for this link.":
 		"Dieser Browser hat keine lokalen Daten für diesen Link.",
-	Today: "Heute",
 	Unlock: "Entsperren",
-	"Used to calculate how much time you have left this week.":
-		"Wird verwendet, um die verbleibende Zeit einer Woche zu berechnen.",
-	"Used to calculate how much time you have left today.":
-		"Wird verwendet, um die verbleibende Zeit eines Tages zu berechnen.",
+	"Used to calculate your quitting time and depot credit.":
+		"Wird verwendet, um deinen Feierabend und die Depot-Gutschrift zu berechnen.",
 	"View on Github": "Auf GitHub ansehen",
-	"Week remaining: {duration}": "Verbleibend diese Woche: {duration}",
-	"Weekly target": "Wochenarbeitszeit",
 	"Wrong password.": "Falsches Passwort.",
 	h: "h",
 	m: "min",

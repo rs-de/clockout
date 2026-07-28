@@ -254,3 +254,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 83. Migrate tracking-document.ts payload to blocks/bookings; keep English idents
     `(edit tracking-document.ts + 2 test fixtures; rename Buchung/feierabendSec)`
+
+84. Rewrite app.tsx for the new model: setup/settings + block/booking UI
+    `(edit app.tsx/app.css/de.ts: daily-minimum config, blocks, Buchen form)`

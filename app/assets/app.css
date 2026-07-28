@@ -446,6 +446,7 @@ legend {
 input[type="text"],
 input[type="password"],
 input[type="number"],
+input[type="time"],
 select {
 	font: inherit;
 	font-size: 1rem;
@@ -523,32 +524,25 @@ select:disabled {
 	text-overflow: ellipsis;
 }
 
-.time-stat--day {
+.time-stat--primary {
 	font-size: 1.5rem;
 	font-weight: var(--font-weight-7);
 	color: hsl(var(--primary-11));
 }
 
-.time-stat--week {
+.time-stat--secondary {
 	font-size: 1.0625rem;
 	font-weight: var(--font-weight-6);
 	color: hsl(var(--slate-12));
 }
 
-.time-started {
-	margin: 0.375rem 0 0;
-	color: hsl(var(--slate-11));
-	font-size: 0.8125rem;
-	font-family: ui-monospace, monospace;
-}
-
-.catchup-form {
+.booking-form {
 	display: flex;
 	flex-direction: column;
 	gap: 1rem;
 }
 
-.week-list {
+.block-list {
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
@@ -557,7 +551,7 @@ select:disabled {
 	list-style: none;
 }
 
-.week-list > li.data-row {
+.block-list > li.data-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -569,73 +563,10 @@ select:disabled {
 	font-size: 0.9375rem;
 }
 
-.today-chip {
+.block-duration {
 	flex-shrink: 0;
-	/* --primary-9 (used elsewhere for the fixed brand blue) is only 3.25:1
-	   against white at this text's size/weight — below the 4.5:1 AA
-	   minimum. Reuse .btn-coffee's darker literal shade (5.72:1) instead. */
-	background: hsl(206 100% 36%);
-	color: #fff;
-	font-size: 0.6875rem;
-	font-weight: var(--font-weight-7);
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	padding: 0.1875rem 0.5rem;
-	border-radius: 999px;
-}
-
-.data-row__actions {
-	display: flex;
-	align-items: center;
-	gap: 0.375rem;
-	flex-shrink: 0;
-}
-
-.data-row--editing {
-	justify-content: flex-start;
-	flex-wrap: wrap;
-}
-
-.edit-day-label {
-	flex-shrink: 0;
-}
-
-/* Icon buttons on a data-row: 44px is this app's established minimum tap
-   target (see .btn/.toggle-button) — kept here too despite the small
-   glyph, rather than shrinking the target to match the icon. */
-.edit-day-toggle,
-.edit-day-save {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.75rem;
-	height: 2.75rem;
-	flex-shrink: 0;
-	border: none;
-	border-radius: 0.5rem;
-	cursor: pointer;
-}
-
-.edit-day-toggle {
-	background: transparent;
 	color: hsl(var(--slate-11));
-}
-
-.edit-day-toggle:hover {
-	background: hsl(var(--slate-4));
-	color: hsl(var(--primary-11));
-}
-
-.edit-day-save {
-	/* Same darkened brand blue as .today-chip — white icon needs the same
-	   4.5:1 AA contrast fix. */
-	background: hsl(206 100% 36%);
-	color: #fff;
-	margin-left: auto;
-}
-
-.edit-day-save:hover {
-	background: hsl(206 100% 31%);
+	font-size: 0.8125rem;
 }
 
 /* ── About ──────────────────────────────────────────────── */
