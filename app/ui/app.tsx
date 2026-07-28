@@ -155,6 +155,32 @@ function syncPasswordMatchValidity(
 	)
 }
 
+/**
+ * Same reasoning as `syncPasswordMatchValidity` above: the daily-max cap
+ * isn't expressible via the hours/minutes inputs' own `min`/`max`, since the
+ * constraint is on their *combined* total, not either field alone (a 23h max
+ * on the hours field alone would still let e.g. 9h55m tip over to 10h00m).
+ */
+function syncBookingTimeValidity(
+	form: HTMLFormElement | null,
+	dailyMaxSec: number,
+	t: Translator,
+) {
+	if (!form) return
+	const hours = form.elements.namedItem("bookingHours") as HTMLInputElement
+	const minutes = form.elements.namedItem("bookingMinutes") as HTMLInputElement
+	const totalSec =
+		(Number(hours.value) || 0) * 3600 + (Number(minutes.value) || 0) * 60
+	const message =
+		totalSec > dailyMaxSec
+			? t("Booking time can't exceed the daily max ({max}).", {
+					max: formatDuration(dailyMaxSec),
+				})
+			: ""
+	hours.setCustomValidity(message)
+	minutes.setCustomValidity(message)
+}
+
 // Explicitly asks Chrome-family browsers to offer saving this password,
 // instead of leaning on their heuristics for a form that never navigates
 // (see handleSetupSubmit/handleUnlockSubmit, which do navigate now, but
@@ -937,6 +963,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 		const defaultBookingMinutes = Math.round(summary.defaultBookingSec / 60)
 		const defaultBookingHours = Math.floor(defaultBookingMinutes / 60)
 		const defaultBookingRemainderMinutes = defaultBookingMinutes % 60
+		const dailyMaxSec = data.settings.dailyMax * 60
 
 		return (
 			<div class="time-page">
@@ -1031,6 +1058,13 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 									on("mouseup", (event) =>
 										reassertSelectOnMouseUp(event.currentTarget, event),
 									),
+									on("input", (event) =>
+										syncBookingTimeValidity(
+											event.currentTarget.form,
+											dailyMaxSec,
+											t,
+										),
+									),
 								]}
 							/>
 							<span class="unit" aria-hidden="true">
@@ -1048,6 +1082,13 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 									on("focus", (event) => selectOnFocus(event.currentTarget)),
 									on("mouseup", (event) =>
 										reassertSelectOnMouseUp(event.currentTarget, event),
+									),
+									on("input", (event) =>
+										syncBookingTimeValidity(
+											event.currentTarget.form,
+											dailyMaxSec,
+											t,
+										),
 									),
 								]}
 							/>

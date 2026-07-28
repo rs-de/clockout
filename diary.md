@@ -263,3 +263,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 86. Rewrite e2e.spec.ts for blocks/Buchen; fix stale lighthouse example URL
     `(rewrite e2e.spec.ts; edit lighthouse.ts + verify skill flow section)`
+
+87. Validate booking time <= daily max; native tooltip error (req #11)
+    `(edit app.tsx: syncBookingTimeValidity on h/m inputs; e2e.spec.ts; de.ts)`

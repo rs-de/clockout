@@ -32,7 +32,12 @@ async function setUpTracking(page: Page, password = "correct horse battery") {
 /** Fills a block's start/end via its time inputs (not the Start/Stop
  * buttons) — the buttons stamp the real current time, so completing a
  * multi-hour session through them would mean actually waiting hours. */
-async function fillBlock(page: Page, index: number, start: string, end: string) {
+async function fillBlock(
+	page: Page,
+	index: number,
+	start: string,
+	end: string,
+) {
 	const startInput = page.locator('input[aria-label="Start"]').nth(index)
 	await startInput.fill(start)
 	await startInput.dispatchEvent("change")
@@ -58,9 +63,9 @@ test("setup creates tracking data; Start persists a block across reload", async 
 
 	await page.getByRole("button", { name: "Start" }).click()
 	await expect(page.getByRole("button", { name: "Stop" })).toBeVisible()
-	await expect(page.locator('input[aria-label="Start"]').first()).not.toHaveValue(
-		"",
-	)
+	await expect(
+		page.locator('input[aria-label="Start"]').first(),
+	).not.toHaveValue("")
 
 	await page.reload()
 	await expect(page.getByRole("button", { name: "Stop" })).toBeVisible()
@@ -82,7 +87,9 @@ test("a session shorter than a minute is discarded instead of closing the block"
 
 	// Back to Start, and the block is empty again — as if it never happened.
 	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
-	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue("")
+	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue(
+		"",
+	)
 })
 
 test("completing a block auto-appends a new one, and Buchen banks overtime to the depot", async ({
@@ -104,7 +111,39 @@ test("completing a block auto-appends a new one, and Buchen banks overtime to th
 	await expect(page.getByText("Depot: 1h 00m")).toBeVisible()
 	// Booking resets the day: back to a single empty block.
 	await expect(page.locator(".block-list li")).toHaveCount(1)
-	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue("")
+	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue(
+		"",
+	)
+})
+
+test("booking time can't exceed the daily max; native validation blocks submit", async ({
+	page,
+}) => {
+	await setUpTracking(page)
+
+	// No block/start-stop entry needed — the daily-max check only looks at
+	// the booking form's own hours/minutes fields against settings.dailyMax
+	// (9h55m default), independent of what's actually been worked.
+	const bookingHours = page.locator('input[name="bookingHours"]')
+	const bookingMinutes = page.locator('input[name="bookingMinutes"]')
+	await bookingHours.fill("10")
+	await bookingMinutes.fill("0")
+	await page.getByRole("button", { name: "Book" }).click()
+
+	// Native constraint validation blocks the submit — the field keeps its
+	// (invalid) value instead of the form resetting.
+	await expect(bookingHours).toHaveValue("10")
+	await expect(bookingHours).toHaveJSProperty(
+		"validationMessage",
+		"Booking time can't exceed the daily max (9h 55m).",
+	)
+
+	// Back within range: submit goes through (proven by the sync status
+	// appearing — a blocked submit never fires handleBookDay/syncEngine.sync).
+	await bookingHours.fill("9")
+	await bookingMinutes.fill("55")
+	await page.getByRole("button", { name: "Book" }).click()
+	await expect(page.getByRole("status")).toHaveText("Synced")
 })
 
 test("clicking the logo from an example re-resolves the view instead of freezing it", async ({
