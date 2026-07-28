@@ -100,7 +100,6 @@ test("completing a block auto-appends a new one, and Buchen banks overtime to th
 	await fillBlock(page, 0, "09:00", "17:00")
 
 	await expect(page.locator(".block-list li")).toHaveCount(2)
-	await expect(page.locator(".block-duration")).toHaveText("8h 00m")
 	await expect(page.getByText("Depot: 0h 00m")).toBeVisible()
 
 	// The booking field defaults to the day's worked time (8h), capped at

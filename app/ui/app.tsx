@@ -23,7 +23,6 @@ import {
 import { createSyncEngine, type SyncStatus } from "../utils/sync-engine.ts"
 import {
 	type Block,
-	blockDurationSec,
 	bookDay,
 	createTrackingData,
 	type DateFormat,
@@ -1016,11 +1015,6 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 									})}
 								/>
 							</div>
-							{block.start !== null && block.end !== null && (
-								<span class="block-duration">
-									{formatDuration(blockDurationSec(block, nowSec))}
-								</span>
-							)}
 						</li>
 					))}
 				</ul>

@@ -552,6 +552,11 @@ select:disabled {
 	gap: 1rem;
 }
 
+.booking-form .hm-row {
+	width: 100%;
+	justify-content: center;
+}
+
 .block-list {
 	display: flex;
 	flex-direction: column;
@@ -564,19 +569,13 @@ select:disabled {
 .block-list > li.data-row {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
+	justify-content: center;
 	gap: 0.5rem;
 	padding: 0.625rem 0.875rem;
 	border-radius: 0.5rem;
 	background: hsl(var(--slate-2));
 	color: hsl(var(--slate-12));
 	font-size: 0.9375rem;
-}
-
-.block-duration {
-	flex-shrink: 0;
-	color: hsl(var(--slate-11));
-	font-size: 0.8125rem;
 }
 
 /* ── About ──────────────────────────────────────────────── */

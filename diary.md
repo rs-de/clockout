@@ -272,3 +272,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 89. Fix: pin booking form to page bottom via flex, not just DOM order
     `(edit app.css: .time-page flex:1, .booking-form margin-top:auto)`
+
+90. Drop per-block duration; center block-row and booking-time inputs
+    `(edit app.tsx/app.css: rm .block-duration span+rule; hm-row centering)`
