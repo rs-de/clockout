@@ -251,3 +251,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 82. Rewrite core data model: day blocks + depot + Buchung/Feierabend calc
     `(rewrite time-tracking.ts + time-tracking.test.ts for the new model)`
+
+83. Migrate tracking-document.ts payload to blocks/bookings; keep English idents
+    `(edit tracking-document.ts + 2 test fixtures; rename Buchung/feierabendSec)`

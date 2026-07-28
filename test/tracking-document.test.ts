@@ -15,7 +15,7 @@ const PASSWORD = "correct horse battery staple"
 describe("serializeEncryptedDocument / deserializeEncryptedDocument", () => {
 	test("round-trips through the JSON-safe wire form", async () => {
 		const data = createTrackingData()
-		data.events.push({ t: 0, type: "start" })
+		data.blocks = [{ start: 0, end: null }]
 		const syncKey = await deriveTrackingKey(PASSWORD)
 		const doc = await encryptTrackingData(data, syncKey)
 
@@ -33,7 +33,7 @@ describe("serializeEncryptedDocument / deserializeEncryptedDocument", () => {
 describe("tracking-document", () => {
 	test("round-trips a TrackingData document through encrypt/decrypt", async () => {
 		const data = createTrackingData()
-		data.events.push({ t: 0, type: "start" }, { t: 3600, type: "stop" })
+		data.blocks = [{ start: 0, end: 3600 }]
 
 		const syncKey = await deriveTrackingKey(PASSWORD)
 		const doc = await encryptTrackingData(data, syncKey)

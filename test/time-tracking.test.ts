@@ -9,10 +9,10 @@ import {
 	DEFAULT_DAILY_MINIMUM,
 	defaultBookingSec,
 	depotSec,
-	feierabendSec,
 	formatDuration,
 	isRunning,
 	MIN_SESSION_SEC,
+	quittingTimeSec,
 	setBlockField,
 	startBlock,
 	stopBlock,
@@ -54,7 +54,7 @@ describe("createTrackingData", () => {
 		assert.equal(a.settings.dailyMinimum, DEFAULT_DAILY_MINIMUM)
 		assert.equal(a.settings.dailyMax, DEFAULT_DAILY_MAX)
 		assert.deepEqual(a.blocks, [{ start: null, end: null }])
-		assert.deepEqual(a.buchungen, [])
+		assert.deepEqual(a.bookings, [])
 	})
 })
 
@@ -179,7 +179,7 @@ describe("depotSec", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: null, end: null }],
-			buchungen: [
+			bookings: [
 				{ t: 0, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 1 * H },
 				{ t: 1, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 2 * H },
 			],
@@ -188,10 +188,10 @@ describe("depotSec", () => {
 	})
 })
 
-describe("feierabendSec", () => {
+describe("quittingTimeSec", () => {
 	test("now + dailyMin when nothing worked and no depot", () => {
 		const data = createTrackingData(settings())
-		assert.equal(feierabendSec(data, 0), 7 * H)
+		assert.equal(quittingTimeSec(data, 0), 7 * H)
 	})
 
 	test("an existing depot pulls it earlier", () => {
@@ -199,9 +199,9 @@ describe("feierabendSec", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: null, end: null }],
-			buchungen: [{ t: 0, workedSec: 0, bookingSec: 0, depotAfterSec: 1 * H }],
+			bookings: [{ t: 0, workedSec: 0, bookingSec: 0, depotAfterSec: 1 * H }],
 		}
-		assert.equal(feierabendSec(data, 0), 6 * H)
+		assert.equal(quittingTimeSec(data, 0), 6 * H)
 	})
 
 	test("stays fixed while a block is running, as `now` advances", () => {
@@ -209,9 +209,9 @@ describe("feierabendSec", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 9 * H, end: null }],
-			buchungen: [],
+			bookings: [],
 		}
-		assert.equal(feierabendSec(data, 10 * H), feierabendSec(data, 11 * H))
+		assert.equal(quittingTimeSec(data, 10 * H), quittingTimeSec(data, 11 * H))
 	})
 
 	test("recedes once tracking pauses (now advances, worked time doesn't)", () => {
@@ -219,9 +219,9 @@ describe("feierabendSec", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 9 * H, end: 10 * H }],
-			buchungen: [],
+			bookings: [],
 		}
-		assert.ok(feierabendSec(data, 11 * H) > feierabendSec(data, 10 * H))
+		assert.ok(quittingTimeSec(data, 11 * H) > quittingTimeSec(data, 10 * H))
 	})
 
 	test("can land in the past once the minimum is already covered", () => {
@@ -229,9 +229,9 @@ describe("feierabendSec", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: 8 * H }],
-			buchungen: [],
+			bookings: [],
 		}
-		assert.ok(feierabendSec(data, 9 * H) < 9 * H)
+		assert.ok(quittingTimeSec(data, 9 * H) < 9 * H)
 	})
 })
 
@@ -241,7 +241,7 @@ describe("defaultBookingSec", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: 8 * H }],
-			buchungen: [],
+			bookings: [],
 		}
 		assert.equal(defaultBookingSec(data, 8 * H), 8 * H)
 	})
@@ -251,7 +251,7 @@ describe("defaultBookingSec", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: 11 * H }],
-			buchungen: [],
+			bookings: [],
 		}
 		assert.equal(defaultBookingSec(data, 11 * H), (9 * 60 + 55) * 60)
 	})
@@ -263,7 +263,7 @@ describe("bookDay", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: 5 * H }],
-			buchungen: [],
+			bookings: [],
 		}
 		const booked = bookDay(data, defaultBookingSec(data, 5 * H), 5 * H)
 		assert.equal(depotSec(booked), 0)
@@ -275,7 +275,7 @@ describe("bookDay", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: worked }],
-			buchungen: [],
+			bookings: [],
 		}
 		const booked = bookDay(data, defaultBookingSec(data, worked), worked)
 		assert.equal(depotSec(booked), 1.5 * H)
@@ -287,7 +287,7 @@ describe("bookDay", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: worked }],
-			buchungen: [],
+			bookings: [],
 		}
 		const booked = bookDay(data, defaultBookingSec(data, worked), worked)
 		assert.equal(depotSec(booked), worked - 7 * H)
@@ -299,7 +299,7 @@ describe("bookDay", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: worked }],
-			buchungen: [],
+			bookings: [],
 		}
 		const bookedDefault = bookDay(data, worked, worked)
 		const bookedLower = bookDay(data, 7.5 * H, worked)
@@ -313,7 +313,7 @@ describe("bookDay", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: worked }],
-			buchungen: [],
+			bookings: [],
 		}
 		// Booked only 6h (below the 7h minimum) out of 8h worked: the credit
 		// term is floored at 0, but the un-booked 2h is still banked in full.
@@ -327,10 +327,10 @@ describe("bookDay", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: worked }],
-			buchungen: [],
+			bookings: [],
 		}
 		const booked = bookDay(data, 100 * H, worked)
-		assert.equal(booked.buchungen.at(-1)?.bookingSec, worked)
+		assert.equal(booked.bookings.at(-1)?.bookingSec, worked)
 	})
 
 	test("clamps a bookingSec above the daily max", () => {
@@ -339,10 +339,10 @@ describe("bookDay", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: worked }],
-			buchungen: [],
+			bookings: [],
 		}
 		const booked = bookDay(data, 100 * H, worked)
-		assert.equal(booked.buchungen.at(-1)?.bookingSec, (9 * 60 + 55) * 60)
+		assert.equal(booked.bookings.at(-1)?.bookingSec, (9 * 60 + 55) * 60)
 	})
 
 	test("clamps a negative bookingSec up to 0", () => {
@@ -351,10 +351,10 @@ describe("bookDay", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: worked }],
-			buchungen: [],
+			bookings: [],
 		}
 		const booked = bookDay(data, -100, worked)
-		assert.equal(booked.buchungen.at(-1)?.bookingSec, 0)
+		assert.equal(booked.bookings.at(-1)?.bookingSec, 0)
 		assert.equal(depotSec(booked), worked)
 	})
 
@@ -364,24 +364,28 @@ describe("bookDay", () => {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: worked }],
-			buchungen: [{ t: -1, workedSec: 1 * H, bookingSec: 1 * H, depotAfterSec: 5 * 60 }],
+			bookings: [
+				{ t: -1, workedSec: 1 * H, bookingSec: 1 * H, depotAfterSec: 5 * 60 },
+			],
 		}
 		const booked = bookDay(data, worked, worked)
 
 		assert.deepEqual(booked.blocks, [{ start: null, end: null }])
-		assert.equal(booked.buchungen.length, 2)
-		assert.equal(booked.buchungen[0]?.depotAfterSec, 5 * 60)
+		assert.equal(booked.bookings.length, 2)
+		assert.equal(booked.bookings[0]?.depotAfterSec, 5 * 60)
 		assert.equal(depotSec(booked), 5 * 60 + (worked - 7 * H))
 	})
 })
 
 describe("summarize", () => {
-	test("bundles the running state, worked/depot time, and Feierabend consistently", () => {
+	test("bundles the running state, worked/depot time, and quitting time consistently", () => {
 		const data: TrackingData = {
 			id: "test",
 			settings: settings(),
 			blocks: [{ start: 0, end: null }],
-			buchungen: [{ t: -1, workedSec: 1 * H, bookingSec: 1 * H, depotAfterSec: 30 * 60 }],
+			bookings: [
+				{ t: -1, workedSec: 1 * H, bookingSec: 1 * H, depotAfterSec: 30 * 60 },
+			],
 		}
 		const now = 2 * H
 		const summary = summarize(data, new Date(now * 1000))
@@ -389,7 +393,7 @@ describe("summarize", () => {
 		assert.equal(summary.isRunning, true)
 		assert.equal(summary.workedSec, 2 * H)
 		assert.equal(summary.depotSec, 30 * 60)
-		assert.equal(summary.feierabendSec, now + 7 * H - 30 * 60 - 2 * H)
+		assert.equal(summary.quittingTimeSec, now + 7 * H - 30 * 60 - 2 * H)
 		assert.equal(summary.defaultBookingSec, 2 * H)
 	})
 })

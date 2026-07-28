@@ -20,7 +20,7 @@ export type EncryptedTrackingDocument = {
 	ciphertext: Uint8Array<ArrayBuffer>
 }
 
-type TrackingPayload = Pick<TrackingData, "settings" | "events">
+type TrackingPayload = Pick<TrackingData, "settings" | "blocks" | "bookings">
 
 /** A password-derived key, cached so repeat syncs skip re-running PBKDF2. */
 export type TrackingSyncKey = { key: CryptoKey; salt: Uint8Array<ArrayBuffer> }
@@ -40,7 +40,8 @@ export async function encryptTrackingData(
 ): Promise<EncryptedTrackingDocument> {
 	const payload: TrackingPayload = {
 		settings: data.settings,
-		events: data.events,
+		blocks: data.blocks,
+		bookings: data.bookings,
 	}
 	const { iv, ciphertext } = await encrypt(JSON.stringify(payload), syncKey.key)
 	return { id: data.id, salt: syncKey.salt, iv, ciphertext }
@@ -53,7 +54,12 @@ export async function decryptTrackingData(
 ): Promise<TrackingData> {
 	const plaintext = await decrypt(doc.ciphertext, doc.iv, syncKey.key)
 	const payload = JSON.parse(plaintext) as TrackingPayload
-	return { id: doc.id, settings: payload.settings, events: payload.events }
+	return {
+		id: doc.id,
+		settings: payload.settings,
+		blocks: payload.blocks,
+		bookings: payload.bookings,
+	}
 }
 
 /** JSON-safe wire/storage form of an EncryptedTrackingDocument. */

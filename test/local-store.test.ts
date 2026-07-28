@@ -22,7 +22,7 @@ describe("local-store", () => {
 
 	test("round-trips a saved TrackingData document", async () => {
 		const data = createTrackingData()
-		data.events.push({ t: 0, type: "start" })
+		data.blocks = [{ start: 0, end: null }]
 
 		await saveTrackingData(data)
 		const loaded = await loadTrackingData()

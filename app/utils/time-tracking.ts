@@ -32,7 +32,7 @@ export type Block = {
  * entry", never a value that's separately stored and patched. Booking also
  * discards that day's block events, since they're now fully folded in here.
  */
-export type Buchung = {
+export type Booking = {
 	/** Unix timestamp in seconds, when the booking was made. */
 	t: number
 	/** The day's total worked time, before capping to `bookingSec`. */
@@ -50,7 +50,7 @@ export type TrackingData = {
 	 * block (see `ensureTrailingBlock`). */
 	blocks: Block[]
 	/** Append-only ledger of past bookings, oldest first. */
-	buchungen: Buchung[]
+	bookings: Booking[]
 }
 
 export const DEFAULT_DAILY_MINIMUM = 7 * 60
@@ -71,7 +71,7 @@ export function createTrackingData(
 	},
 	id: string = nanoid(),
 ): TrackingData {
-	return { id, settings, blocks: [{ start: null, end: null }], buchungen: [] }
+	return { id, settings, blocks: [{ start: null, end: null }], bookings: [] }
 }
 
 /** Below this, a start/stop pair is discarded as an accidental tap (requirement #10). */
@@ -158,7 +158,7 @@ export function workedSec(blocks: Block[], nowSec: number): number {
 /** The depot is always derived from the latest booking, never
  * stored-and-patched directly (requirement #9). */
 export function depotSec(data: TrackingData): number {
-	return data.buchungen.at(-1)?.depotAfterSec ?? 0
+	return data.bookings.at(-1)?.depotAfterSec ?? 0
 }
 
 /**
@@ -168,7 +168,7 @@ export function depotSec(data: TrackingData): number {
  * it only moves if tracking pauses (recedes) or the depot changes. May be
  * in the past, which just means the minimum is already covered.
  */
-export function feierabendSec(data: TrackingData, nowSec: number): number {
+export function quittingTimeSec(data: TrackingData, nowSec: number): number {
 	return (
 		nowSec +
 		data.settings.dailyMinimum * 60 -
@@ -208,13 +208,14 @@ export function bookDay(
 		Math.max(0, bookingSec),
 		Math.min(worked, dailyMaxSec),
 	)
-	const delta = Math.max(0, clampedBookingSec - dailyMinSec) + (worked - clampedBookingSec)
+	const delta =
+		Math.max(0, clampedBookingSec - dailyMinSec) + (worked - clampedBookingSec)
 
 	return {
 		...data,
 		blocks: [{ start: null, end: null }],
-		buchungen: [
-			...data.buchungen,
+		bookings: [
+			...data.bookings,
 			{
 				t: nowSec,
 				workedSec: worked,
@@ -229,11 +230,14 @@ export type TrackingSummary = {
 	isRunning: boolean
 	workedSec: number
 	depotSec: number
-	feierabendSec: number
+	quittingTimeSec: number
 	defaultBookingSec: number
 }
 
-export function summarize(data: TrackingData, now: Date = new Date()): TrackingSummary {
+export function summarize(
+	data: TrackingData,
+	now: Date = new Date(),
+): TrackingSummary {
 	const nowSec = Math.floor(now.getTime() / 1000)
 	const worked = workedSec(data.blocks, nowSec)
 	const depot = depotSec(data)
@@ -243,7 +247,7 @@ export function summarize(data: TrackingData, now: Date = new Date()): TrackingS
 		isRunning: isRunning(data.blocks),
 		workedSec: worked,
 		depotSec: depot,
-		feierabendSec: nowSec + data.settings.dailyMinimum * 60 - depot - worked,
+		quittingTimeSec: nowSec + data.settings.dailyMinimum * 60 - depot - worked,
 		defaultBookingSec: Math.min(worked, dailyMaxSec),
 	}
 }
