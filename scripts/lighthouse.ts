@@ -10,7 +10,7 @@ const BASE_URL = process.argv[2] ?? "http://localhost:44100"
 const PAGES: Array<{ name: string; path: string }> = [
 	{ name: "Home (setup)", path: "/" },
 	{ name: "About", path: "/about" },
-	{ name: "Tracking (example)", path: "/example/steady-week" },
+	{ name: "Tracking (example)", path: "/example/lunch-break" },
 ]
 
 const CATEGORIES = [

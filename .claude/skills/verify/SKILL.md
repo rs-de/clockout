@@ -80,17 +80,24 @@ page.on("pageerror", (err) => console.log(`pageerror: ${err.message}`))
 
 ## Flow to drive
 
-1. Load `/` → setup form (weekly/daily target fields, password + repeat,
+1. Load `/` → setup form (daily minimum/max fields, password + repeat,
    "Save and start tracking" button — English by default; German only
    when the request's `Accept-Language` resolves to `de`).
 2. Submit → creates a `TrackingData` doc, saves to IndexedDB, switches to
-   the tracking screen (day/week remaining time, Start/Stop toggle).
-3. Click Start/Stop → toggles, persists the event, remaining time ticks
-   live.
-4. Reload → should land straight back on the tracking screen with state
+   the tracking screen (quitting-time estimate, depot, a block list,
+   Start/Stop toggle, a Buchen booking form).
+3. Click Start/Stop → fills the active block's start/end with the current
+   time; a completed block auto-appends a new empty one. A block's time
+   inputs are also directly editable (type "09:00"/"17:00" + `change`) —
+   the fast way to test a full multi-hour session without waiting for real
+   time to pass.
+4. Submit the booking form (defaults to worked time, capped at the daily
+   max) → banks time over the daily minimum into the depot, resets to a
+   single empty block.
+5. Reload → should land straight back on the tracking screen with state
    intact (no password re-entry) — this is the point of the IndexedDB
    local-store layer.
-5. To inspect raw persisted state: `page.evaluate` against
+6. To inspect raw persisted state: `page.evaluate` against
    `indexedDB.open("clockout", 1)` → object store `"tracking-data"`, key
    `"current"`.
 

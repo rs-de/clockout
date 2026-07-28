@@ -260,3 +260,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 85. Rewrite demo examples for the block/depot model; fix stale app-copy
     `(rewrite examples.ts/examples.test.ts; update about/manifest copy+i18n)`
+
+86. Rewrite e2e.spec.ts for blocks/Buchen; fix stale lighthouse example URL
+    `(rewrite e2e.spec.ts; edit lighthouse.ts + verify skill flow section)`

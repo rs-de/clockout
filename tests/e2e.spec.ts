@@ -20,52 +20,47 @@ const test = base.extend({
 	},
 })
 
-// The Start/Stop toggle stays hidden while any day this week still needs a
-// catch-up answer — true for a brand-new setup on any weekday but Monday,
-// since every elapsed weekday with no events counts as pending. Real tests
-// that just need to get past setup resolve it the same way a user would:
-// mark every pending day "Did not work".
-async function resolvePendingWeek(page: Page) {
-	const saveButton = page.getByRole("button", { name: "Save hours" })
-	const toggleButton = page.getByRole("button", { name: /^(Start|Stop)$/ })
-	// The tracking screen renders asynchronously (IndexedDB load) after the
-	// URL already changed, so wait for whichever of the two actually shows up
-	// instead of sampling the DOM immediately.
-	await saveButton.or(toggleButton).first().waitFor()
-	if ((await saveButton.count()) === 0) return
-	for (const checkbox of await page.getByLabel("Did not work").all()) {
-		await checkbox.check()
-	}
-	await saveButton.click()
-	// The submit handler awaits its IndexedDB write before re-rendering, so
-	// waiting for the toggle to reappear guarantees the save actually landed
-	// before the test navigates away.
-	await toggleButton.waitFor()
+async function setUpTracking(page: Page, password = "correct horse battery") {
+	await page.goto("/")
+	await page.getByLabel("Password", { exact: true }).fill(password)
+	await page.getByLabel("Repeat password").fill(password)
+	await page.getByRole("button", { name: "Save and start tracking" }).click()
+	await expect(page).toHaveURL(/\/d\//)
+	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
+}
+
+/** Fills a block's start/end via its time inputs (not the Start/Stop
+ * buttons) — the buttons stamp the real current time, so completing a
+ * multi-hour session through them would mean actually waiting hours. */
+async function fillBlock(page: Page, index: number, start: string, end: string) {
+	const startInput = page.locator('input[aria-label="Start"]').nth(index)
+	await startInput.fill(start)
+	await startInput.dispatchEvent("change")
+	const endInput = page.locator('input[aria-label="End"]').nth(index)
+	await endInput.fill(end)
+	await endInput.dispatchEvent("change")
 }
 
 test("home page loads the setup form", async ({ page }) => {
 	await page.goto("/")
 	await expect(page.locator("h1")).toHaveText("ClockOut")
+	await expect(page.getByText("Daily minimum")).toBeVisible()
+	await expect(page.getByText("Daily max")).toBeVisible()
 	await expect(
 		page.getByRole("button", { name: "Save and start tracking" }),
 	).toBeVisible()
 })
 
-test("setup creates tracking data, toggling persists across reload", async ({
+test("setup creates tracking data; Start persists a block across reload", async ({
 	page,
 }) => {
-	await page.goto("/")
-	await page.getByLabel("Password", { exact: true }).fill("correct horse")
-	await page.getByLabel("Repeat password").fill("correct horse")
-	await page.getByRole("button", { name: "Save and start tracking" }).click()
+	await setUpTracking(page)
 
-	await expect(page).toHaveURL(/\/d\//)
-	await resolvePendingWeek(page)
-	const toggle = page.getByRole("button", { name: "Start" })
-	await expect(toggle).toBeVisible()
-
-	await toggle.click()
+	await page.getByRole("button", { name: "Start" }).click()
 	await expect(page.getByRole("button", { name: "Stop" })).toBeVisible()
+	await expect(page.locator('input[aria-label="Start"]').first()).not.toHaveValue(
+		"",
+	)
 
 	await page.reload()
 	await expect(page.getByRole("button", { name: "Stop" })).toBeVisible()
@@ -75,64 +70,41 @@ test("setup creates tracking data, toggling persists across reload", async ({
 	// pushing to the server until the password is re-entered.
 	await page.getByRole("button", { name: "Stop" }).click()
 	await expect(page.getByRole("status")).toHaveText("Synced")
-	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
 })
 
-test("a stale dangling start hides the toggle until catch-up is resolved", async ({
+test("a session shorter than a minute is discarded instead of closing the block", async ({
 	page,
 }) => {
-	await page.goto("/example/forgot-stop-friday")
+	await setUpTracking(page)
 
-	// Friday's session was left open days ago — nothing live to "Stop", so
-	// the toggle must stay hidden rather than let a click silently close
-	// that whole gap out as one bogus multi-day session.
-	await expect(page.getByRole("button", { name: "Stop" })).toHaveCount(0)
-	await expect(page.getByRole("button", { name: "Start" })).toHaveCount(0)
+	await page.getByRole("button", { name: "Start" }).click()
+	await page.getByRole("button", { name: "Stop" }).click()
 
-	const fieldsets = page.locator("fieldset")
-	await fieldsets.nth(0).getByRole("spinbutton").first().fill("8")
-	await page.getByRole("button", { name: "Save hours" }).click()
-
+	// Back to Start, and the block is empty again — as if it never happened.
 	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
+	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue("")
 })
 
-test("editing an already-recorded day updates its total and the week's remaining time", async ({
+test("completing a block auto-appends a new one, and Buchen banks overtime to the depot", async ({
 	page,
 }) => {
-	await page.goto("/example/steady-week")
+	await setUpTracking(page)
 
-	const weekRemaining = page.getByText(/Week remaining:/)
-	const weekRemainingBefore = await weekRemaining.textContent()
+	await fillBlock(page, 0, "09:00", "17:00")
 
-	// aria-label carries the day's date, which shifts week to week — match
-	// on the stable prefix instead of the full label.
-	await page.locator('[aria-label^="Edit "]').first().click()
+	await expect(page.locator(".block-list li")).toHaveCount(2)
+	await expect(page.locator(".block-duration")).toHaveText("8h 00m")
+	await expect(page.getByText("Depot: 0h 00m")).toBeVisible()
 
-	const hours = page.locator('input[name="hours"]')
-	await expect(hours).toBeFocused()
+	// The booking field defaults to the day's worked time (8h), capped at
+	// the daily max — submitting it banks the 1h over the 7h minimum.
+	await expect(page.locator('input[name="bookingHours"]')).toHaveValue("8")
+	await page.getByRole("button", { name: "Book" }).click()
 
-	// Real keystrokes on top of the pre-filled default (8), not .fill() —
-	// this is what actually exercises select-on-focus. Typing "6" must
-	// *replace* the "8", not append to it (a prior bug typed "3" onto an
-	// unselected "8" and got "38").
-	await expect(hours).toHaveValue("8")
-	await page.keyboard.type("6")
-	await expect(hours).toHaveValue("6")
-	await page.locator('input[name="minutes"]').fill("0")
-	// The save button is a real submit bound to this row's form via the
-	// `form` attribute — Enter in either field submits it natively, no
-	// explicit click needed.
-	await page.keyboard.press("Enter")
-
-	await expect(page.locator(".week-list li").first()).toContainText("6h 00m")
-	// Back to the read-only row: the edit control reappears, the save
-	// button (and its inputs) are gone.
-	await expect(page.locator('[aria-label^="Edit "]').first()).toBeVisible()
-	await expect(hours).toHaveCount(0)
-	// The freed-up 2 hours (8h -> 6h) must show up in the week's remaining
-	// time automatically — this is the whole point of the event-sourced
-	// "adjust" delta, not a value the UI computes and pushes separately.
-	await expect(weekRemaining).not.toHaveText(weekRemainingBefore ?? "")
+	await expect(page.getByText("Depot: 1h 00m")).toBeVisible()
+	// Booking resets the day: back to a single empty block.
+	await expect(page.locator(".block-list li")).toHaveCount(1)
+	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue("")
 })
 
 test("clicking the logo from an example re-resolves the view instead of freezing it", async ({
@@ -143,8 +115,8 @@ test("clicking the logo from an example re-resolves the view instead of freezing
 	// instead of remounting it — the URL-based view must be re-resolved
 	// explicitly on navigation, or the page keeps showing the example after
 	// the URL has already moved on.
-	await page.goto("/example/steady-week")
-	await expect(page.getByText('Demo: simulating "A steady week"')).toBeVisible()
+	await page.goto("/example/lunch-break")
+	await expect(page.getByText('Demo: simulating "Lunch break"')).toBeVisible()
 
 	await page.click(".app-nav__brand-wrapper a")
 
@@ -155,15 +127,20 @@ test("clicking the logo from an example re-resolves the view instead of freezing
 	).toBeVisible()
 })
 
+test("an example shows its scenario's quitting time and depot, and never syncs", async ({
+	page,
+}) => {
+	await page.goto("/example/depot-credit")
+	await expect(page.getByText("Depot: 3h 00m")).toBeVisible()
+	await expect(page.getByText(/Quitting time: \d{2}:\d{2}/)).toBeVisible()
+	// Example data is in-memory only — no sync status ever appears.
+	await expect(page.getByRole("status", { name: /Sync|Synced/ })).toHaveCount(0)
+})
+
 test("home shows a link to the existing doc, not the tracking screen directly", async ({
 	page,
 }) => {
-	await page.goto("/")
-	await page.getByLabel("Password", { exact: true }).fill("correct horse")
-	await page.getByLabel("Repeat password").fill("correct horse")
-	await page.getByRole("button", { name: "Save and start tracking" }).click()
-	await expect(page).toHaveURL(/\/d\//)
-	await resolvePendingWeek(page)
+	await setUpTracking(page)
 	const docUrl = page.url()
 
 	// Simulate the same soft-navigation path as the logo: go elsewhere, then
@@ -185,24 +162,19 @@ test("home shows a link to the existing doc, not the tracking screen directly", 
 	).toBeVisible()
 })
 
-test("home offers a settings link that edits and persists weekly/daily targets", async ({
+test("home offers a settings link that edits and persists daily minimum/max", async ({
 	page,
 }) => {
-	await page.goto("/")
-	await page.getByLabel("Password", { exact: true }).fill("correct horse")
-	await page.getByLabel("Repeat password").fill("correct horse")
-	await page.getByRole("button", { name: "Save and start tracking" }).click()
-	await expect(page).toHaveURL(/\/d\//)
-	await resolvePendingWeek(page)
+	await setUpTracking(page)
 
 	// Soft-navigate back to / (same reasoning as the logo/home tests above),
 	// where settings editing is offered.
 	await page.goto("/")
 	await page.getByRole("button", { name: "Settings" }).click()
 
-	const weeklyHours = page.locator('input[name="weeklyHours"]')
-	await expect(weeklyHours).toHaveValue("35")
-	await weeklyHours.fill("20")
+	const dailyMinHours = page.locator('input[name="dailyMinHours"]')
+	await expect(dailyMinHours).toHaveValue("7")
+	await dailyMinHours.fill("6")
 	await page.getByRole("button", { name: "Save" }).click()
 
 	// Back on home; reopening settings must show the persisted value, not
@@ -211,7 +183,7 @@ test("home offers a settings link that edits and persists weekly/daily targets",
 	const homeLink = page.getByRole("link", { name: "Go to your time tracking" })
 	await expect(homeLink).toBeVisible()
 	await page.getByRole("button", { name: "Settings" }).click()
-	await expect(weeklyHours).toHaveValue("20")
+	await expect(dailyMinHours).toHaveValue("6")
 
 	await page.getByRole("button", { name: "Cancel" }).click()
 	await expect(homeLink).toBeVisible()
@@ -220,15 +192,7 @@ test("home offers a settings link that edits and persists weekly/daily targets",
 test("clearing local storage requires re-entering the password to unlock", async ({
 	page,
 }) => {
-	await page.goto("/")
-	await page.getByLabel("Password", { exact: true }).fill("correct horse")
-	await page.getByLabel("Repeat password").fill("correct horse")
-	await page.getByRole("button", { name: "Save and start tracking" }).click()
-	// Setup awaits its first sync push (or a 2s cap) before navigating, so by
-	// the time the URL below actually changes, the server already has an
-	// encrypted copy to unlock against.
-	await expect(page).toHaveURL(/\/d\//)
-	await resolvePendingWeek(page)
+	await setUpTracking(page)
 	const docUrl = page.url()
 
 	// Simulate a fresh browser / cleared cache: wipe the IndexedDB the sync
@@ -253,7 +217,7 @@ test("clearing local storage requires re-entering the password to unlock", async
 
 	// The correct password re-derives the same sync key from the doc's salt
 	// and decrypts the server copy back into the tracking view.
-	await page.getByLabel("Password").fill("correct horse")
+	await page.getByLabel("Password").fill("correct horse battery")
 	await page.getByRole("button", { name: "Unlock" }).click()
 	await expect(page).toHaveURL(docUrl)
 	await expect(
