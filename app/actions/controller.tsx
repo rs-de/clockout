@@ -33,7 +33,7 @@ export default createController(routes, {
 					name: "ClockOut",
 					short_name: "ClockOut",
 					description: t(
-						"Lean, private time tracking that shows how much time is left today and this week.",
+						"Lean, private time tracking that shows when you're done for the day and how much overtime is banked.",
 					),
 					start_url: "/",
 					display: "standalone",

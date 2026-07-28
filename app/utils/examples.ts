@@ -1,92 +1,64 @@
 import {
+	type Block,
+	type Booking,
 	DEFAULT_DAILY_MAX,
+	DEFAULT_DAILY_MINIMUM,
 	DEFAULT_DATE_FORMAT,
-	DEFAULT_WEEKLY_TARGET_MIN,
-	type RelativeEvent,
-	resolveRelativeEvents,
-	startOfWeek,
 	type TrackingData,
 } from "./time-tracking.ts"
+
+export type RelativeBlock = {
+	/** Local "HH:MM", resolved against the same pretend day as the example's `pretendTime`. */
+	start: string
+	/** Omitted for a still-open block. */
+	end?: string
+}
 
 export type Example = {
 	id: string
 	title: string
 	description: string
 	/**
-	 * The moment this example pretends "now" is: a weekday (0 = Monday .. 6 =
-	 * Sunday) anchored to the real current week — so the simulated date never
-	 * goes stale — plus a fixed local time-of-day chosen deliberately after
-	 * every same-day ("daysAgo: 0") event time below, so nothing in the
-	 * example is ever dated in the pretend future.
+	 * Local "HH:MM" time-of-day this example pretends "now" is, anchored to
+	 * today's real date — so the simulated moment never goes stale. No
+	 * weekday to anchor to anymore now that tracking is single-day.
 	 */
-	pretendWeekday: number
 	pretendTime: string
-	events: RelativeEvent[]
+	blocks: RelativeBlock[]
+	/** Depot balance already banked before this example opens, e.g. to show
+	 * off requirement #8's quitting-time credit. */
+	depotSec?: number
 }
 
 // Ordered from the most ordinary case to the most edge-case-y, since this
 // is also the order the About page lists them in — a first-time visitor
-// should see what normal, everyday use looks like before the recovery/edge
-// cases most people won't hit often.
+// should see what normal, everyday use looks like before the two
+// requirement-specific demos.
 export const EXAMPLES: Example[] = [
-	{
-		id: "steady-week",
-		title: "A steady week",
-		description: "Four completed days, and Friday afternoon almost done.",
-		pretendWeekday: 4, // Friday
-		pretendTime: "16:00",
-		events: [
-			{ daysAgo: 4, time: "09:00", type: "start" },
-			{ daysAgo: 4, time: "17:00", type: "stop" },
-			{ daysAgo: 3, time: "09:00", type: "start" },
-			{ daysAgo: 3, time: "17:00", type: "stop" },
-			{ daysAgo: 2, time: "09:00", type: "start" },
-			{ daysAgo: 2, time: "17:00", type: "stop" },
-			{ daysAgo: 1, time: "09:00", type: "start" },
-			{ daysAgo: 1, time: "17:00", type: "stop" },
-			{ daysAgo: 0, time: "13:00", type: "start" },
-		],
-	},
 	{
 		id: "lunch-break",
 		title: "Lunch break",
 		description:
-			"Stopped for lunch and restarted — the shown start time stays pinned to the morning.",
-		pretendWeekday: 2, // Wednesday
+			"A finished morning block, then an afternoon block still running after lunch.",
 		pretendTime: "15:00",
-		events: [
-			{ daysAgo: 2, time: "09:00", type: "start" }, // Monday, 8h
-			{ daysAgo: 2, time: "17:00", type: "stop" },
-			{ daysAgo: 1, time: "09:00", type: "start" }, // Tuesday, 8h
-			{ daysAgo: 1, time: "17:00", type: "stop" },
-			{ daysAgo: 0, time: "09:00", type: "start" },
-			{ daysAgo: 0, time: "12:00", type: "stop" },
-			{ daysAgo: 0, time: "13:00", type: "start" },
-		],
+		blocks: [{ start: "09:00", end: "12:00" }, { start: "13:00" }],
 	},
 	{
-		id: "forgot-stop",
-		title: "Forgot to stop",
+		id: "depot-credit",
+		title: "Overtime already banked",
 		description:
-			"An open session from a few days ago that was never stopped — shows the catch-up form.",
-		pretendWeekday: 4, // Friday
-		pretendTime: "09:30",
-		events: [
-			{ daysAgo: 4, time: "09:00", type: "start" }, // Monday, worked normally
-			{ daysAgo: 4, time: "17:00", type: "stop" },
-			{ daysAgo: 3, time: "09:00", type: "start" }, // Tuesday, never stopped
-		],
+			"Yesterday's overtime is already in the depot, so today's quitting time comes earlier.",
+		pretendTime: "08:00",
+		blocks: [],
+		depotSec: 3 * 60 * 60,
 	},
 	{
-		id: "forgot-stop-friday",
-		title: "Forgot to stop on Friday",
+		id: "past-quitting-time",
+		title: "Already past quitting time",
 		description:
-			"A Friday session left open over the weekend — Friday, Saturday and Sunday all come up for catch-up on Monday.",
-		pretendWeekday: 0, // Monday
-		pretendTime: "08:30",
-		events: [
-			{ daysAgo: 3, time: "09:00", type: "start" }, // Friday last week, never stopped
-		],
+			"A long open session — quitting time is shown as a real clock time even once it's in the past.",
+		pretendTime: "18:00",
+		blocks: [{ start: "08:00" }],
 	},
 ]
 
@@ -95,19 +67,37 @@ export function findExample(id: string): Example | undefined {
 }
 
 /**
- * The example's pretend "now" the instant it's opened — `pretendWeekday`
- * within `realNow`'s real week, at the example's own fixed `pretendTime`.
- * This is a static anchor, not a live clock: callers that want the demo to
- * keep ticking forward (see requirement #7) capture this once at load time,
- * derive a fixed offset from the real clock, and re-apply that offset to
- * the real "now" on every later render — see `app/ui/app.tsx`.
+ * The example's pretend "now" the instant it's opened — today's real date at
+ * the example's own fixed `pretendTime`. A static anchor, not a live clock:
+ * callers that want the demo to keep ticking forward (requirement #8's live
+ * quitting-time estimate) capture this once at load time, derive a fixed
+ * offset from the real clock, and re-apply that offset to the real "now" on
+ * every later render — see `app/ui/app.tsx`.
  */
 export function resolvePretendNow(example: Example, realNow: Date): Date {
 	const [hours, minutes] = example.pretendTime.split(":").map(Number)
-	const pretendNow = startOfWeek(realNow)
-	pretendNow.setDate(pretendNow.getDate() + example.pretendWeekday)
+	const pretendNow = new Date(realNow)
 	pretendNow.setHours(hours ?? 0, minutes ?? 0, 0, 0)
 	return pretendNow
+}
+
+function resolveBlockTime(time: string, pretendDay: Date): number {
+	const [hours, minutes] = time.split(":").map(Number)
+	const d = new Date(pretendDay)
+	d.setHours(hours ?? 0, minutes ?? 0, 0, 0)
+	return Math.floor(d.getTime() / 1000)
+}
+
+/** Resolves `RelativeBlock`s (local "HH:MM" strings) against `pretendNow`'s
+ * calendar day into real `Block`s. */
+export function resolveRelativeBlocks(
+	relativeBlocks: RelativeBlock[],
+	pretendNow: Date,
+): Block[] {
+	return relativeBlocks.map(({ start, end }) => ({
+		start: resolveBlockTime(start, pretendNow),
+		end: end ? resolveBlockTime(end, pretendNow) : null,
+	}))
 }
 
 /** Builds a fresh, in-memory-only TrackingData for `example`, relative to `realNow`. */
@@ -116,13 +106,33 @@ export function buildExampleData(
 	realNow: Date,
 ): TrackingData {
 	const pretendNow = resolvePretendNow(example, realNow)
+	const blocks = resolveRelativeBlocks(example.blocks, pretendNow)
+
+	// Mirrors the real app's trailing-empty-block invariant (see
+	// `ensureTrailingBlock` in time-tracking.ts): only add one once the last
+	// block is actually complete — a still-open block is already the active one.
+	const last = blocks.at(-1)
+	if (!last || last.end !== null) blocks.push({ start: null, end: null })
+
+	const bookings: Booking[] = example.depotSec
+		? [
+				{
+					t: Math.floor(pretendNow.getTime() / 1000) - 1,
+					workedSec: 0,
+					bookingSec: 0,
+					depotAfterSec: example.depotSec,
+				},
+			]
+		: []
+
 	return {
 		id: `example-${example.id}`,
 		settings: {
-			weeklyTargetMin: DEFAULT_WEEKLY_TARGET_MIN,
+			dailyMinimum: DEFAULT_DAILY_MINIMUM,
 			dailyMax: DEFAULT_DAILY_MAX,
 			dateFormat: DEFAULT_DATE_FORMAT,
 		},
-		events: resolveRelativeEvents(example.events, pretendNow),
+		blocks,
+		bookings,
 	}
 }

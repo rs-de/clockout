@@ -7,17 +7,17 @@ import {
 	type Example,
 	findExample,
 	resolvePretendNow,
+	resolveRelativeBlocks,
 } from "../app/utils/examples.ts"
 import { summarize } from "../app/utils/time-tracking.ts"
 
-function testExample(pretendWeekday: number, pretendTime = "16:00"): Example {
+function testExample(pretendTime: string): Example {
 	return {
 		id: "test-example",
 		title: "Test example",
 		description: "",
-		pretendWeekday,
 		pretendTime,
-		events: [],
+		blocks: [],
 	}
 }
 
@@ -32,27 +32,57 @@ describe("findExample", () => {
 })
 
 describe("resolvePretendNow", () => {
-	test("lands on the requested weekday within the real current week", () => {
-		const example = testExample(4)
+	test("uses today's real date at the example's own fixed pretendTime", () => {
+		const example = testExample("09:05")
+		const realNow = new Date(2026, 6, 13, 14, 32, 9)
 
-		// A Monday and a Sunday of the *same* real ISO week should both
-		// resolve to that week's Friday.
-		const monday = new Date(2026, 6, 13, 10, 30)
-		const sunday = new Date(2026, 6, 19, 8, 0)
+		const pretendNow = resolvePretendNow(example, realNow)
 
-		assert.equal(resolvePretendNow(example, monday).getDate(), 17)
-		assert.equal(resolvePretendNow(example, sunday).getDate(), 17)
-	})
-
-	test("uses the example's own fixed pretendTime, not the real time-of-day", () => {
-		const example = testExample(4, "09:05")
-		const now = new Date(2026, 6, 13, 14, 32, 9)
-
-		const pretendNow = resolvePretendNow(example, now)
-
+		assert.equal(pretendNow.getFullYear(), 2026)
+		assert.equal(pretendNow.getMonth(), 6)
+		assert.equal(pretendNow.getDate(), 13)
 		assert.equal(pretendNow.getHours(), 9)
 		assert.equal(pretendNow.getMinutes(), 5)
 		assert.equal(pretendNow.getSeconds(), 0)
+	})
+
+	test("stays valid regardless of which real day it's opened on", () => {
+		const example = testExample("08:30")
+
+		const fromA = resolvePretendNow(example, new Date(2026, 6, 15, 10, 0))
+		const fromB = resolvePretendNow(example, new Date(2027, 2, 1, 10, 0))
+
+		assert.equal(fromA.getDate(), 15)
+		assert.equal(fromB.getDate(), 1)
+		assert.equal(fromA.getHours(), 8)
+		assert.equal(fromB.getHours(), 8)
+	})
+})
+
+describe("resolveRelativeBlocks", () => {
+	test("resolves start/end HH:MM against the pretend day", () => {
+		const pretendNow = new Date(2026, 6, 15, 15, 0)
+		const blocks = resolveRelativeBlocks(
+			[{ start: "09:00", end: "12:00" }],
+			pretendNow,
+		)
+		assert.deepEqual(blocks, [
+			{
+				start: Math.floor(new Date(2026, 6, 15, 9, 0).getTime() / 1000),
+				end: Math.floor(new Date(2026, 6, 15, 12, 0).getTime() / 1000),
+			},
+		])
+	})
+
+	test("an omitted end resolves to a still-open block", () => {
+		const pretendNow = new Date(2026, 6, 15, 15, 0)
+		const blocks = resolveRelativeBlocks([{ start: "13:00" }], pretendNow)
+		assert.deepEqual(blocks, [
+			{
+				start: Math.floor(new Date(2026, 6, 15, 13, 0).getTime() / 1000),
+				end: null,
+			},
+		])
 	})
 })
 
@@ -64,53 +94,37 @@ describe("buildExampleData", () => {
 		const data = buildExampleData(example, new Date(2026, 6, 15, 14, 0))
 
 		assert.equal(data.id, "example-lunch-break")
-		assert.equal(data.events.length, 7)
+		assert.equal(data.settings.dailyMinimum, 7 * 60)
 	})
 
-	test("steady-week's history lands in the same real week regardless of which real weekday it's built on", () => {
-		const example = findExample("steady-week")
-		if (!example) throw new Error("expected the steady-week example to exist")
+	test("lunch-break: two blocks, no extra trailing block since the last is still open", () => {
+		const example = findExample("lunch-break")
+		if (!example) throw new Error("expected the lunch-break example to exist")
 
-		// This is the scenario that motivated pretendWeekday: building the
-		// same example on a Monday morning must not scatter its history into
-		// last week's bucket, or "week remaining" would look untouched.
-		const monday = new Date(2026, 6, 13, 8, 0)
-		const friday = new Date(2026, 6, 17, 16, 0)
+		const data = buildExampleData(example, new Date(2026, 6, 15, 3, 0))
 
-		const fromMonday = buildExampleData(example, monday)
-		const fromFriday = buildExampleData(example, friday)
-
-		assert.deepEqual(fromMonday.events, fromFriday.events)
-
-		const weeklyFromMonday = summarize(
-			fromMonday,
-			resolvePretendNow(example, monday),
-		).weeklyWorkedSec
-		const weeklyFromFriday = summarize(
-			fromFriday,
-			resolvePretendNow(example, friday),
-		).weeklyWorkedSec
-
-		assert.ok(weeklyFromMonday > 0)
-		assert.equal(weeklyFromMonday, weeklyFromFriday)
+		assert.equal(data.blocks.length, 2)
+		assert.equal(data.blocks[1]?.end, null)
 	})
 
-	test("the open Friday session in steady-week has already started relative to its own anchor", () => {
-		const example = findExample("steady-week")
-		if (!example) throw new Error("expected the steady-week example to exist")
+	test("depot-credit: an empty block list gets a trailing empty block", () => {
+		const example = findExample("depot-credit")
+		if (!example) throw new Error("expected the depot-credit example to exist")
 
-		// A very early real hour is the case that broke the earlier
-		// real-time-of-day design: the pretend "now" must still land after
-		// the Friday start time regardless of what real hour this is built at.
-		const realNow = new Date(2026, 6, 13, 3, 0)
-		const data = buildExampleData(example, realNow)
-		const summary = summarize(data, resolvePretendNow(example, realNow))
+		const data = buildExampleData(example, new Date(2026, 6, 15, 3, 0))
 
-		assert.equal(summary.isRunning, true)
-		assert.ok(
-			summary.dailyWorkedSec > 0,
-			"the still-open Friday session should already contribute worked time relative to its own anchor, not look like it hasn't started yet",
-		)
+		assert.deepEqual(data.blocks, [{ start: null, end: null }])
+		assert.equal(data.bookings.length, 1)
+		assert.equal(data.bookings[0]?.depotAfterSec, example.depotSec)
+	})
+
+	test("an example with no depotSec starts with an empty bookings ledger", () => {
+		const example = findExample("lunch-break")
+		if (!example) throw new Error("expected the lunch-break example to exist")
+
+		const data = buildExampleData(example, new Date(2026, 6, 15, 3, 0))
+
+		assert.deepEqual(data.bookings, [])
 	})
 })
 
@@ -118,5 +132,35 @@ describe("EXAMPLES", () => {
 	test("every example has a unique id", () => {
 		const ids = EXAMPLES.map((example) => example.id)
 		assert.equal(new Set(ids).size, ids.length)
+	})
+
+	test("depot-credit: the banked depot brings today's quitting time earlier", () => {
+		const example = findExample("depot-credit")
+		if (!example) throw new Error("expected the depot-credit example to exist")
+
+		const realNow = new Date(2026, 6, 15, 10, 0)
+		const data = buildExampleData(example, realNow)
+		const pretendNow = resolvePretendNow(example, realNow)
+		const summary = summarize(data, pretendNow)
+
+		const pretendNowSec = Math.floor(pretendNow.getTime() / 1000)
+		const withoutDepotQuittingTimeSec =
+			pretendNowSec + data.settings.dailyMinimum * 60
+		assert.equal(summary.depotSec, example.depotSec)
+		assert.ok(summary.quittingTimeSec < withoutDepotQuittingTimeSec)
+	})
+
+	test("past-quitting-time: still running, quitting time already elapsed", () => {
+		const example = findExample("past-quitting-time")
+		if (!example)
+			throw new Error("expected the past-quitting-time example to exist")
+
+		const realNow = new Date(2026, 6, 15, 3, 0)
+		const data = buildExampleData(example, realNow)
+		const pretendNow = resolvePretendNow(example, realNow)
+		const summary = summarize(data, pretendNow)
+
+		assert.equal(summary.isRunning, true)
+		assert.ok(summary.quittingTimeSec < Math.floor(pretendNow.getTime() / 1000))
 	})
 })

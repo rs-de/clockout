@@ -72,7 +72,7 @@ export function Document(handle: Handle<DocumentProps>) {
 					<meta
 						name="description"
 						content={t(
-							"Lean, private time tracking that shows how much time is left today and this week.",
+							"Lean, private time tracking that shows when you're done for the day and how much overtime is banked.",
 						)}
 					/>
 					<link rel="manifest" href={manifestHref} />

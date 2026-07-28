@@ -257,3 +257,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 84. Rewrite app.tsx for the new model: setup/settings + block/booking UI
     `(edit app.tsx/app.css/de.ts: daily-minimum config, blocks, Buchen form)`
+
+85. Rewrite demo examples for the block/depot model; fix stale app-copy
+    `(rewrite examples.ts/examples.test.ts; update about/manifest copy+i18n)`
