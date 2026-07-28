@@ -481,6 +481,13 @@ select:disabled {
 /* ── Time tracking ──────────────────────────────────────── */
 
 .time-page {
+	/* Stretches to fill .app-main's leftover vertical space (it's flex: 1
+	   inside a column too) so .booking-form's margin-top: auto below has
+	   room to push it down to the page's actual bottom, not just below the
+	   block list. Once the block list is tall enough to fill that space on
+	   its own, margin-top: auto resolves to 0 and the form simply follows
+	   at the normal `gap`, same as any other section here. */
+	flex: 1;
 	width: 100%;
 	max-width: 28rem;
 	display: flex;
@@ -537,6 +544,9 @@ select:disabled {
 }
 
 .booking-form {
+	/* Pushed to the bottom of .time-page's now-stretched box, but never
+	   closer than the container's own `gap` above it — see .time-page. */
+	margin-top: auto;
 	display: flex;
 	flex-direction: column;
 	gap: 1rem;

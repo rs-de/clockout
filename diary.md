@@ -269,3 +269,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 88. Move Buchungszeit/Buchen form to page bottom, below sync status
     `(edit app.tsx: reorder booking-form after footer in TrackingScreen)`
+
+89. Fix: pin booking form to page bottom via flex, not just DOM order
+    `(edit app.css: .time-page flex:1, .booking-form margin-top:auto)`
