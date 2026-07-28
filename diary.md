@@ -248,3 +248,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 81. Redesign spec: drop weekly model for day/block/depot + Feierabend time
     `(edit requirements.md: replace weekly target/breakdown with new model)`
+
+82. Rewrite core data model: day blocks + depot + Buchung/Feierabend calc
+    `(rewrite time-tracking.ts + time-tracking.test.ts for the new model)`

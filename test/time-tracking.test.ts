@@ -2,33 +2,29 @@ import assert from "node:assert/strict"
 import { describe, test } from "node:test"
 
 import {
-	catchupDays,
+	blockDurationSec,
+	bookDay,
 	createTrackingData,
 	DEFAULT_DAILY_MAX,
-	DEFAULT_WEEKLY_TARGET_MIN,
-	editDay,
+	DEFAULT_DAILY_MINIMUM,
+	defaultBookingSec,
+	depotSec,
+	feierabendSec,
 	formatDuration,
 	isRunning,
 	MIN_SESSION_SEC,
-	resolveCatchup,
-	resolveRelativeEvents,
-	startOfWeek,
+	setBlockField,
+	startBlock,
+	stopBlock,
 	summarize,
 	type TrackingData,
-	toggleTracking,
-	weeklyBreakdown,
-	weeklyEntryDays,
-	workedSecondsInRange,
+	workedSec,
 } from "../app/utils/time-tracking.ts"
 
 const H = 3600
 
-function dayEnd(date: Date): Date {
-	return new Date(date.getTime() + 24 * H * 1000)
-}
-
-function toSec(date: Date): number {
-	return Math.floor(date.getTime() / 1000)
+function settings(overrides: Partial<TrackingData["settings"]> = {}) {
+	return { dailyMinimum: 7 * 60, dailyMax: 9 * 60 + 55, ...overrides }
 }
 
 describe("formatDuration", () => {
@@ -55,1060 +51,345 @@ describe("createTrackingData", () => {
 		const b = createTrackingData()
 
 		assert.notEqual(a.id, b.id)
-		assert.equal(a.settings.weeklyTargetMin, DEFAULT_WEEKLY_TARGET_MIN)
+		assert.equal(a.settings.dailyMinimum, DEFAULT_DAILY_MINIMUM)
 		assert.equal(a.settings.dailyMax, DEFAULT_DAILY_MAX)
-		assert.deepEqual(a.events, [])
+		assert.deepEqual(a.blocks, [{ start: null, end: null }])
+		assert.deepEqual(a.buchungen, [])
+	})
+})
+
+describe("setBlockField / trailing-block invariant", () => {
+	test("filling the trailing block's start doesn't append another block yet", () => {
+		const blocks = setBlockField([{ start: null, end: null }], 0, "start", 100)
+		assert.deepEqual(blocks, [{ start: 100, end: null }])
+	})
+
+	test("completing a block auto-appends a fresh empty block (req #7)", () => {
+		const blocks = setBlockField([{ start: 0, end: null }], 0, "end", 200)
+		assert.deepEqual(blocks, [
+			{ start: 0, end: 200 },
+			{ start: null, end: null },
+		])
+	})
+
+	test("discards a pair shorter than MIN_SESSION_SEC back to empty (req #10)", () => {
+		const blocks = setBlockField([{ start: 0, end: null }], 0, "end", 30)
+		assert.deepEqual(blocks, [{ start: null, end: null }])
+	})
+
+	test("discards an end typed before its start the same way", () => {
+		const blocks = setBlockField([{ start: 100, end: null }], 0, "end", 50)
+		assert.deepEqual(blocks, [{ start: null, end: null }])
+	})
+
+	test("editing an earlier, already-complete block doesn't touch the trailing empty one", () => {
+		const initial = [
+			{ start: 0, end: 1 * H },
+			{ start: null, end: null },
+		]
+		const blocks = setBlockField(initial, 0, "start", 10 * 60)
+		assert.deepEqual(blocks, [
+			{ start: 10 * 60, end: 1 * H },
+			{ start: null, end: null },
+		])
+	})
+})
+
+describe("startBlock / stopBlock", () => {
+	test("startBlock fills the trailing block's start", () => {
+		const blocks = startBlock([{ start: null, end: null }], 100)
+		assert.deepEqual(blocks, [{ start: 100, end: null }])
+	})
+
+	test("startBlock is a no-op once already started", () => {
+		const blocks = [{ start: 100, end: null }]
+		assert.deepEqual(startBlock(blocks, 200), blocks)
+	})
+
+	test("stopBlock closes the block and appends a fresh empty one", () => {
+		const blocks = stopBlock([{ start: 0, end: null }], MIN_SESSION_SEC)
+		assert.deepEqual(blocks, [
+			{ start: 0, end: MIN_SESSION_SEC },
+			{ start: null, end: null },
+		])
+	})
+
+	test("stopBlock discards a too-short session instead of closing it", () => {
+		const blocks = stopBlock([{ start: 0, end: null }], MIN_SESSION_SEC - 1)
+		assert.deepEqual(blocks, [{ start: null, end: null }])
+	})
+
+	test("stopBlock is a no-op when nothing is running", () => {
+		const blocks = [{ start: null, end: null }]
+		assert.deepEqual(stopBlock(blocks, 100), blocks)
 	})
 })
 
 describe("isRunning", () => {
-	test("false with no events", () => {
-		assert.equal(isRunning([]), false)
+	test("false for a fresh (empty) block list", () => {
+		assert.equal(isRunning([{ start: null, end: null }]), false)
 	})
 
-	test("true when last event is an unmatched start", () => {
-		assert.equal(isRunning([{ t: 100, type: "start" }]), true)
+	test("true while the trailing block is open", () => {
+		assert.equal(isRunning([{ start: 100, end: null }]), true)
 	})
 
-	test("false when last event is a stop", () => {
+	test("false once the trailing block is closed (a fresh one follows)", () => {
 		assert.equal(
 			isRunning([
-				{ t: 100, type: "start" },
-				{ t: 200, type: "stop" },
+				{ start: 0, end: 100 },
+				{ start: null, end: null },
 			]),
 			false,
 		)
 	})
 })
 
-describe("toggleTracking", () => {
-	test("starts when stopped", () => {
-		assert.deepEqual(toggleTracking([], 100), [{ t: 100, type: "start" }])
+describe("blockDurationSec / workedSec", () => {
+	test("a completed block counts its fixed duration", () => {
+		assert.equal(blockDurationSec({ start: 0, end: 2 * H }, 5 * H), 2 * H)
 	})
 
-	test("stops when running and the session is at least MIN_SESSION_SEC", () => {
-		const events = [{ t: 0, type: "start" as const }]
-		assert.deepEqual(toggleTracking(events, MIN_SESSION_SEC), [
-			{ t: 0, type: "start" },
-			{ t: MIN_SESSION_SEC, type: "stop" },
-		])
+	test("an open block counts elapsed time up to now", () => {
+		assert.equal(blockDurationSec({ start: 0, end: null }, 1.5 * H), 1.5 * H)
 	})
 
-	test("discards the start instead of recording a session under MIN_SESSION_SEC", () => {
-		const events = [
-			{ t: 0, type: "start" as const },
-			{ t: -100, type: "stop" as const },
+	test("an unfilled block counts nothing", () => {
+		assert.equal(blockDurationSec({ start: null, end: null }, 5 * H), 0)
+	})
+
+	test("sums multiple blocks in one day (e.g. a lunch break)", () => {
+		const blocks = [
+			{ start: 0, end: 2 * H },
+			{ start: 3 * H, end: 6 * H },
+			{ start: null, end: null },
 		]
-		assert.deepEqual(toggleTracking(events, MIN_SESSION_SEC - 1), [
-			{ t: -100, type: "stop" },
-		])
+		assert.equal(workedSec(blocks, 6 * H), 5 * H)
 	})
 })
 
-describe("resolveRelativeEvents", () => {
-	test("resolves daysAgo/time relative to now into a concrete timestamp", () => {
-		const now = new Date(2026, 6, 15, 10, 0)
-		const resolved = resolveRelativeEvents(
-			[{ daysAgo: 3, time: "22:00", type: "start" }],
-			now,
-		)
-		assert.deepEqual(resolved, [
-			{ t: toSec(new Date(2026, 6, 12, 22, 0)), type: "start" },
-		])
+describe("depotSec", () => {
+	test("0 with no bookings yet", () => {
+		const data = createTrackingData(settings())
+		assert.equal(depotSec(data), 0)
 	})
 
-	test("resolves multiple events, preserving order", () => {
-		const now = new Date(2026, 6, 15, 10, 0)
-		const resolved = resolveRelativeEvents(
-			[
-				{ daysAgo: 1, time: "09:00", type: "start" },
-				{ daysAgo: 1, time: "17:00", type: "stop" },
-				{ daysAgo: 0, time: "09:00", type: "start" },
+	test("the latest booking's depotAfterSec, not a sum of deltas", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: null, end: null }],
+			buchungen: [
+				{ t: 0, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 1 * H },
+				{ t: 1, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 2 * H },
 			],
-			now,
-		)
-		assert.deepEqual(resolved, [
-			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" },
-			{ t: toSec(new Date(2026, 6, 14, 17, 0)), type: "stop" },
-			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" },
-		])
-	})
-
-	test("stays valid regardless of which real day `now` falls on", () => {
-		const nowA = new Date(2026, 6, 15, 10, 0)
-		const nowB = new Date(2027, 2, 1, 10, 0)
-		const descriptor = [{ daysAgo: 2, time: "08:30", type: "start" as const }]
-
-		assert.deepEqual(resolveRelativeEvents(descriptor, nowA), [
-			{ t: toSec(new Date(2026, 6, 13, 8, 30)), type: "start" },
-		])
-		assert.deepEqual(resolveRelativeEvents(descriptor, nowB), [
-			{ t: toSec(new Date(2027, 1, 27, 8, 30)), type: "start" },
-		])
+		}
+		assert.equal(depotSec(data), 2 * H)
 	})
 })
 
-describe("workedSecondsInRange", () => {
-	test("sums multiple completed sessions in one day (e.g. a lunch break)", () => {
-		const events = [
-			{ t: 0, type: "start" as const },
-			{ t: 2 * H, type: "stop" as const },
-			{ t: 3 * H, type: "start" as const },
-			{ t: 6 * H, type: "stop" as const },
-		]
-		const seconds = workedSecondsInRange(
-			events,
-			new Date(0),
-			new Date(24 * H * 1000),
-			new Date(6 * H * 1000),
-		)
-		assert.equal(seconds, 5 * H)
+describe("feierabendSec", () => {
+	test("now + dailyMin when nothing worked and no depot", () => {
+		const data = createTrackingData(settings())
+		assert.equal(feierabendSec(data, 0), 7 * H)
 	})
 
-	test("clips a session that spans the range boundary (e.g. across midnight)", () => {
-		const events = [
-			{ t: 22 * H, type: "start" as const },
-			{ t: 26 * H, type: "stop" as const }, // 2h into the next day
-		]
-		const dayOneSeconds = workedSecondsInRange(
-			events,
-			new Date(0),
-			new Date(24 * H * 1000),
-			new Date(26 * H * 1000),
-		)
-		const dayTwoSeconds = workedSecondsInRange(
-			events,
-			new Date(24 * H * 1000),
-			new Date(48 * H * 1000),
-			new Date(26 * H * 1000),
-		)
-		assert.equal(dayOneSeconds, 2 * H)
-		assert.equal(dayTwoSeconds, 2 * H)
+	test("an existing depot pulls it earlier", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: null, end: null }],
+			buchungen: [{ t: 0, workedSec: 0, bookingSec: 0, depotAfterSec: 1 * H }],
+		}
+		assert.equal(feierabendSec(data, 0), 6 * H)
 	})
 
-	test("counts an open (still running) start up to `now`", () => {
-		const events = [{ t: 0, type: "start" as const }]
-		const seconds = workedSecondsInRange(
-			events,
-			new Date(0),
-			new Date(24 * H * 1000),
-			new Date(1.5 * H * 1000),
-		)
-		assert.equal(seconds, 1.5 * H)
+	test("stays fixed while a block is running, as `now` advances", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 9 * H, end: null }],
+			buchungen: [],
+		}
+		assert.equal(feierabendSec(data, 10 * H), feierabendSec(data, 11 * H))
 	})
 
-	test("ignores sessions entirely outside the range", () => {
-		const events = [
-			{ t: -10 * H, type: "start" as const },
-			{ t: -8 * H, type: "stop" as const },
-		]
-		const seconds = workedSecondsInRange(
-			events,
-			new Date(0),
-			new Date(24 * H * 1000),
-			new Date(24 * H * 1000),
-		)
-		assert.equal(seconds, 0)
+	test("recedes once tracking pauses (now advances, worked time doesn't)", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 9 * H, end: 10 * H }],
+			buchungen: [],
+		}
+		assert.ok(feierabendSec(data, 11 * H) > feierabendSec(data, 10 * H))
 	})
 
-	test("a skipDay marker contributes nothing and doesn't open or close a session", () => {
-		const events = [
-			{ t: 0, type: "skipDay" as const },
-			{ t: 1 * H, type: "start" as const },
-			{ t: 3 * H, type: "stop" as const },
-		]
-		const seconds = workedSecondsInRange(
-			events,
-			new Date(0),
-			new Date(24 * H * 1000),
-			new Date(24 * H * 1000),
-		)
-		assert.equal(seconds, 2 * H)
+	test("can land in the past once the minimum is already covered", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: 8 * H }],
+			buchungen: [],
+		}
+		assert.ok(feierabendSec(data, 9 * H) < 9 * H)
 	})
 })
 
-describe("weeklyBreakdown", () => {
-	test("returns Monday..Friday only by default, weekends hidden", () => {
-		const now = new Date(2026, 6, 15, 13, 30) // Wednesday
-		const breakdown = weeklyBreakdown([], now)
-
-		assert.equal(breakdown.length, 5)
-		assert.equal(breakdown[0]?.day.getDate(), 13) // Monday
-		assert.equal(breakdown[4]?.day.getDate(), 17) // Friday
-		assert.ok(breakdown.every((entry) => entry.workedSec === 0))
+describe("defaultBookingSec", () => {
+	test("equals worked time when under the daily max", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: 8 * H }],
+			buchungen: [],
+		}
+		assert.equal(defaultBookingSec(data, 8 * H), 8 * H)
 	})
 
-	test("includes Saturday once `now` is Saturday", () => {
-		const now = new Date(2026, 6, 18, 10, 0) // Saturday
-		const breakdown = weeklyBreakdown([], now)
-
-		assert.deepEqual(
-			breakdown.map((entry) => entry.day.getDate()),
-			[13, 14, 15, 16, 17, 18],
-		)
-	})
-
-	test("includes both weekend days once `now` is Sunday", () => {
-		const now = new Date(2026, 6, 19, 10, 0) // Sunday
-		const breakdown = weeklyBreakdown([], now)
-
-		assert.deepEqual(
-			breakdown.map((entry) => entry.day.getDate()),
-			[13, 14, 15, 16, 17, 18, 19],
-		)
-	})
-
-	test("prepends last weekend when last Friday was never stopped", () => {
-		const events = [
-			// Friday 2026-07-10, never stopped.
-			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
-		]
-		const now = new Date(2026, 6, 13, 9, 30) // Monday 2026-07-13
-
-		const breakdown = weeklyBreakdown(events, now)
-
-		assert.deepEqual(
-			breakdown.map((entry) => entry.day.getDate()),
-			[10, 11, 12, 13, 14, 15, 16, 17],
-		)
-		assert.equal(breakdown[0]?.workedSec, 0) // stale, pending catch-up
-	})
-
-	test("does not prepend last weekend when last Friday has a clean stop", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
-		]
-		const now = new Date(2026, 6, 13, 9, 30) // Monday 2026-07-13
-
-		const breakdown = weeklyBreakdown(events, now)
-
-		assert.deepEqual(
-			breakdown.map((entry) => entry.day.getDate()),
-			[13, 14, 15, 16, 17],
-		)
-	})
-
-	test("attributes each day's worked seconds to the right entry", () => {
-		const monday9to17 = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-		]
-		const tuesday9to12 = [
-			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 14, 12, 0)), type: "stop" as const },
-		]
-		const now = new Date(2026, 6, 15, 10, 0) // Wednesday
-
-		const breakdown = weeklyBreakdown([...monday9to17, ...tuesday9to12], now)
-
-		assert.equal(breakdown[0]?.workedSec, 8 * H) // Monday
-		assert.equal(breakdown[1]?.workedSec, 3 * H) // Tuesday
-		assert.equal(breakdown[2]?.workedSec, 0) // Wednesday, nothing yet
-	})
-
-	test("clips an open session live up to `now`", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-		]
-		const now = new Date(2026, 6, 13, 11, 30) // same Monday, still running
-
-		const breakdown = weeklyBreakdown(events, now)
-
-		assert.equal(breakdown[0]?.workedSec, 2.5 * H)
-	})
-
-	test("a session forgotten open days ago doesn't bleed fake hours into today's entry", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-			// Tuesday start, never stopped.
-			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
-		]
-		const now = new Date(2026, 6, 17, 9, 30) // Friday, still "running"
-
-		const breakdown = weeklyBreakdown(events, now)
-
-		assert.equal(breakdown[0]?.workedSec, 8 * H) // Monday: real, unaffected
-		assert.equal(breakdown[1]?.workedSec, 0) // Tuesday: stale, pending catch-up
-		assert.equal(breakdown[2]?.workedSec, 0) // Wednesday: stale, pending catch-up
-		assert.equal(breakdown[3]?.workedSec, 0) // Thursday: stale, pending catch-up
-		assert.equal(breakdown[4]?.workedSec, 0) // Friday (today): not real progress
+	test("caps at the daily max once worked time exceeds it", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: 11 * H }],
+			buchungen: [],
+		}
+		assert.equal(defaultBookingSec(data, 11 * H), (9 * 60 + 55) * 60)
 	})
 })
 
-describe("catchupDays", () => {
-	test("empty when there are no events at all", () => {
-		assert.deepEqual(catchupDays([], new Date(2026, 6, 15)), [])
+describe("bookDay", () => {
+	test("a day under the minimum banks nothing", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: 5 * H }],
+			buchungen: [],
+		}
+		const booked = bookDay(data, defaultBookingSec(data, 5 * H), 5 * H)
+		assert.equal(depotSec(booked), 0)
 	})
 
-	test("empty when the open start began today", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
-		]
-		assert.deepEqual(catchupDays(events, new Date(2026, 6, 15, 17, 0)), [])
+	test("a day over the minimum (but under the max) banks the surplus", () => {
+		const worked = 8.5 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			buchungen: [],
+		}
+		const booked = bookDay(data, defaultBookingSec(data, worked), worked)
+		assert.equal(depotSec(booked), 1.5 * H)
 	})
 
-	test("empty when the last event is a stop from today", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 15, 12, 0)), type: "stop" as const },
-		]
-		assert.deepEqual(catchupDays(events, new Date(2026, 6, 15, 17, 0)), [])
+	test("a day over the max banks worked-minus-minimum, split across both terms", () => {
+		const worked = 11 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			buchungen: [],
+		}
+		const booked = bookDay(data, defaultBookingSec(data, worked), worked)
+		assert.equal(depotSec(booked), worked - 7 * H)
 	})
 
-	test("one day when the open start began yesterday", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 14, 22, 0)), type: "start" as const },
-		]
-		const days = catchupDays(events, new Date(2026, 6, 15, 8, 0))
-		assert.deepEqual(
-			days.map((d) => d.getTime()),
-			[new Date(2026, 6, 14).getTime()],
-		)
+	test("banks the same total regardless of the exact bookingSec, as long as it's >= dailyMin", () => {
+		const worked = 8 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			buchungen: [],
+		}
+		const bookedDefault = bookDay(data, worked, worked)
+		const bookedLower = bookDay(data, 7.5 * H, worked)
+		assert.equal(depotSec(bookedDefault), 1 * H)
+		assert.equal(depotSec(bookedLower), 1 * H)
 	})
 
-	test("one row per day up to (not including) today for a multi-day gap after an open start", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
-		]
-		const days = catchupDays(events, new Date(2026, 6, 14, 8, 0))
-		assert.deepEqual(
-			days.map((d) => d.getTime()),
-			[10, 11, 12, 13].map((date) => new Date(2026, 6, date).getTime()),
-		)
+	test("booking below the minimum still banks the un-booked remainder in full", () => {
+		const worked = 8 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			buchungen: [],
+		}
+		// Booked only 6h (below the 7h minimum) out of 8h worked: the credit
+		// term is floored at 0, but the un-booked 2h is still banked in full.
+		const booked = bookDay(data, 6 * H, worked)
+		assert.equal(depotSec(booked), 2 * H)
 	})
 
-	test("empty when a clean stop was yesterday (no full day missing yet)", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 14, 17, 0)), type: "stop" as const },
-		]
-		assert.deepEqual(catchupDays(events, new Date(2026, 6, 15, 8, 0)), [])
+	test("clamps a bookingSec above what was actually worked", () => {
+		const worked = 3 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			buchungen: [],
+		}
+		const booked = bookDay(data, 100 * H, worked)
+		assert.equal(booked.buchungen.at(-1)?.bookingSec, worked)
 	})
 
-	test("a weekend gap after a clean Friday stop is skipped, only Monday remains", () => {
-		const events = [
-			// Friday 2026-07-10, stopped cleanly.
-			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
-		]
-		const days = catchupDays(events, new Date(2026, 6, 14, 8, 0)) // Tuesday
-		assert.deepEqual(
-			days.map((d) => d.getTime()),
-			[new Date(2026, 6, 13).getTime()], // only Monday
-		)
+	test("clamps a bookingSec above the daily max", () => {
+		const worked = 11 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			buchungen: [],
+		}
+		const booked = bookDay(data, 100 * H, worked)
+		assert.equal(booked.buchungen.at(-1)?.bookingSec, (9 * 60 + 55) * 60)
 	})
 
-	test("days after a clean stop, through yesterday, for a multi-day gap that stays within the week", () => {
-		const events = [
-			// Monday 2026-07-13, stopped cleanly.
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-		]
-		const days = catchupDays(events, new Date(2026, 6, 16, 8, 0)) // Thursday
-		assert.deepEqual(
-			days.map((d) => d.getTime()),
-			[14, 15].map((date) => new Date(2026, 6, date).getTime()),
-		)
+	test("clamps a negative bookingSec up to 0", () => {
+		const worked = 8 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			buchungen: [],
+		}
+		const booked = bookDay(data, -100, worked)
+		assert.equal(booked.buchungen.at(-1)?.bookingSec, 0)
+		assert.equal(depotSec(booked), worked)
 	})
 
-	test("a trailing skipDay marker resolves the gap, same as a clean stop", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 11)), type: "skipDay" as const },
-		]
-		assert.deepEqual(catchupDays(events, new Date(2026, 6, 12, 8, 0)), [])
-	})
-})
+	test("resets blocks to a single empty one and appends to the ledger", () => {
+		const worked = 8 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			buchungen: [{ t: -1, workedSec: 1 * H, bookingSec: 1 * H, depotAfterSec: 5 * 60 }],
+		}
+		const booked = bookDay(data, worked, worked)
 
-describe("weeklyEntryDays", () => {
-	test("with zero events ever, every elapsed weekday this week still needs an answer", () => {
-		const now = new Date(2026, 6, 18, 10, 0) // Saturday
-
-		assert.deepEqual(
-			weeklyEntryDays([], now).map((d) => d.getTime()),
-			[13, 14, 15, 16, 17].map((date) => new Date(2026, 6, date).getTime()),
-		)
-	})
-
-	test("includes days before the very first tracked event, within the current week", () => {
-		// First-ever event is Wednesday - Monday and Tuesday have nothing at
-		// all, which catchupDays alone wouldn't catch (it only looks forward
-		// from the last event).
-		const events = [
-			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 15, 17, 0)), type: "stop" as const },
-		]
-		const now = new Date(2026, 6, 16, 10, 0) // Thursday
-
-		const days = weeklyEntryDays(events, now)
-
-		assert.deepEqual(
-			days.map((d) => d.getTime()),
-			[13, 14].map((date) => new Date(2026, 6, date).getTime()),
-		)
-	})
-
-	test("catches an isolated untouched day in the middle of an otherwise-fine week", () => {
-		// Worked Monday, nothing Tuesday, worked Wednesday - catchupDays sees
-		// no unresolved gap at all (Wednesday's stop is only "yesterday"
-		// relative to Thursday), but Tuesday is still genuinely blank.
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 15, 17, 0)), type: "stop" as const },
-		]
-		const now = new Date(2026, 6, 16, 10, 0) // Thursday
-
-		assert.deepEqual(catchupDays(events, now), [])
-		assert.deepEqual(
-			weeklyEntryDays(events, now).map((d) => d.getTime()),
-			[new Date(2026, 6, 14).getTime()],
-		)
-	})
-
-	test("excludes a day with real worked hours or an explicit skipDay marker", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 14)), type: "skipDay" as const },
-		]
-		const now = new Date(2026, 6, 16, 10, 0) // Thursday
-
-		assert.deepEqual(
-			weeklyEntryDays(events, now).map((d) => d.getTime()),
-			[new Date(2026, 6, 15).getTime()], // only Wednesday is genuinely blank
-		)
-	})
-
-	test("excludes today and future days", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-		]
-		const now = new Date(2026, 6, 14, 10, 0) // Tuesday
-
-		assert.deepEqual(weeklyEntryDays(events, now), [])
-	})
-
-	test("returns the classic gap days plus surrounding blank days, all in chronological order", () => {
-		// Monday and Tuesday blank, then an open start Wednesday never
-		// stopped (catchupDays covers Wed+Thu; the blank-day scan fills in
-		// Mon+Tue, which catchupDays alone wouldn't reach).
-		const wedStart = toSec(new Date(2026, 6, 15, 9, 0))
-		const events = [{ t: wedStart, type: "start" as const }]
-		const now = new Date(2026, 6, 17, 10, 0) // Friday
-
-		const days = weeklyEntryDays(events, now)
-
-		assert.deepEqual(
-			days.map((d) => d.getTime()),
-			[13, 14, 15, 16].map((date) => new Date(2026, 6, date).getTime()),
-		)
-	})
-
-	test("a blank Saturday after a resolved Friday is not flagged pending", () => {
-		const events = [
-			// Monday through Friday worked normally.
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 14, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 15, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 16, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 16, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 17, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 17, 17, 0)), type: "stop" as const },
-		]
-		const now = new Date(2026, 6, 19, 10, 0) // Sunday, Saturday left blank
-
-		assert.deepEqual(weeklyEntryDays(events, now), [])
-	})
-
-	test("a blank Saturday after an un-stopped Friday is still flagged pending", () => {
-		const events = [
-			// Monday through Thursday worked normally.
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 14, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 15, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 15, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 16, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 16, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 17, 9, 0)), type: "start" as const }, // Friday, never stopped
-		]
-		const now = new Date(2026, 6, 19, 10, 0) // Sunday
-
-		assert.deepEqual(
-			weeklyEntryDays(events, now).map((d) => d.getTime()),
-			[17, 18].map((date) => new Date(2026, 6, date).getTime()),
-		)
-	})
-})
-
-describe("resolveCatchup", () => {
-	test("returns events unchanged when there are no days to resolve", () => {
-		const events = [
-			{ t: 0, type: "start" as const },
-			{ t: 1 * H, type: "stop" as const },
-		]
-		assert.deepEqual(resolveCatchup(events, [], [], []), events)
-	})
-
-	test("adds only a stop for the open start's own day, preserving its timestamp", () => {
-		const startTs = toSec(new Date(2026, 6, 14, 22, 0))
-		const events = [{ t: startTs, type: "start" as const }]
-		const days = [new Date(2026, 6, 14)]
-
-		assert.deepEqual(resolveCatchup(events, days, [90], [false]), [
-			{ t: startTs, type: "start" },
-			{ t: startTs + 90 * 60, type: "stop" },
-		])
-	})
-
-	test("adds a fresh start/stop pair for worked days, a skipDay marker for explicitly-skipped days, and leaves untouched 0-entry days alone", () => {
-		const startTs = toSec(new Date(2026, 6, 10, 9, 0))
-		const events = [{ t: startTs, type: "start" as const }]
-		const days = [
-			new Date(2026, 6, 10),
-			new Date(2026, 6, 11),
-			new Date(2026, 6, 12),
-			new Date(2026, 6, 13),
-		]
-		const day11Start = toSec(new Date(2026, 6, 11))
-		const day13Start = toSec(new Date(2026, 6, 13))
-
-		// day 10 (open start, 0min, not skipped): left unanswered on its own,
-		// but day 11 needs a fresh session, so day 10's dangling start gets
-		// force-closed first (0 duration) to avoid the two sessions
-		// colliding - same resulting timestamps as if it'd been answered
-		// directly. day 11 (120min): full pair. day 12 (0min, not skipped):
-		// the user never answered for it, so nothing is pushed - it stays
-		// pending. day 13 (0min, explicitly skipped): skipDay marker.
-		assert.deepEqual(
-			resolveCatchup(events, days, [0, 120, 0, 0], [false, false, false, true]),
-			[
-				{ t: startTs, type: "start" },
-				{ t: startTs, type: "stop" },
-				{ t: day11Start, type: "start" },
-				{ t: day11Start + 120 * 60, type: "stop" },
-				{ t: day13Start, type: "skipDay" },
-			],
-		)
-	})
-
-	test("adds a fresh pair for worked days and a skipDay marker for an explicitly-skipped 0-entry day after a clean stop", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
-		]
-		const days = [new Date(2026, 6, 11), new Date(2026, 6, 12)]
-		const day11Start = toSec(new Date(2026, 6, 11))
-		const day12Start = toSec(new Date(2026, 6, 12))
-
-		assert.deepEqual(resolveCatchup(events, days, [240, 0], [false, true]), [
-			...events,
-			{ t: day11Start, type: "start" },
-			{ t: day11Start + 240 * 60, type: "stop" },
-			{ t: day12Start, type: "skipDay" },
-		])
-	})
-
-	test("a 0-entry day left unanswered (not explicitly skipped) is untouched and stays due for entry", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
-		]
-		const days = [new Date(2026, 6, 11)]
-
-		assert.deepEqual(resolveCatchup(events, days, [0], [false]), events)
-	})
-
-	test("a skipDay marker never disrupts an overlapping real session", () => {
-		// Day 0's session (chained from an 08:00 start plus a lot of hours)
-		// can spill past midnight into a day the user separately marks as
-		// skipped - the skipDay marker must still be a pure no-op so it can
-		// never re-open/close a session it happens to fall inside of.
-		const startTs = toSec(new Date(2026, 6, 13, 8, 0)) // Monday 08:00
-		const events = [{ t: startTs, type: "start" as const }]
-		const days = [new Date(2026, 6, 13), new Date(2026, 6, 14)]
-
-		const resolved = resolveCatchup(events, days, [20 * 60, 0], [false, true])
-
-		assert.deepEqual(resolved, [
-			{ t: startTs, type: "start" },
-			{ t: startTs + 20 * H, type: "stop" }, // Tuesday 04:00
-			{ t: toSec(new Date(2026, 6, 14)), type: "skipDay" }, // Tuesday 00:00
-		])
-
-		const summary = summarize(
-			{
-				id: "test-doc",
-				settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-				events: resolved,
-			},
-			new Date(2026, 6, 15, 10, 0),
-		)
-		// Full 20h still counted, unaffected by the skipDay marker landing
-		// chronologically inside the session.
-		assert.equal(summary.weeklyWorkedSec, 20 * H)
-	})
-
-	test("regression: an explicitly-skipped last day doesn't reopen the same day next render", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 10, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 10, 17, 0)), type: "stop" as const },
-		]
-		const now = new Date(2026, 6, 13, 8, 0)
-		const days = catchupDays(events, now)
-
-		const resolved = resolveCatchup(
-			events,
-			days,
-			days.map(() => 0),
-			days.map(() => true),
-		)
-
-		assert.deepEqual(catchupDays(resolved, now), [])
-	})
-
-	test("regression: a large day-0 entry chains into later days instead of colliding or losing hours", () => {
-		// An 08:00 start plus 20h would naturally end at 04:00 the next day,
-		// landing after day 1's own start (00:00) and before day 1's own stop
-		// (20:00) if day 1 were independently anchored at midnight -
-		// workedSecondsInRange's start/stop toggle would then treat day 1's
-		// start as re-opening the session, silently discarding day 0's hours,
-		// and day 1's stop as closing an already-closed session, discarding
-		// day 1's hours too. Chaining day 1 to start when day 0's session
-		// actually ends (instead of always at midnight) keeps every pair
-		// non-overlapping *and* credits the full entered duration for every
-		// day - no clamping, no lost hours.
-		const startTs = toSec(new Date(2026, 6, 13, 8, 0)) // Monday 08:00
-		const events = [{ t: startTs, type: "start" as const }]
-		const days = [
-			new Date(2026, 6, 13),
-			new Date(2026, 6, 14),
-			new Date(2026, 6, 15),
-		]
-
-		const resolved = resolveCatchup(
-			events,
-			days,
-			[20 * 60, 20 * 60, 20 * 60],
-			[false, false, false],
-		)
-
-		// Three fully back-to-back 20h sessions: Mon 08:00 -> Tue 04:00 ->
-		// Wed 00:00 -> Wed 20:00, each chained exactly where the last ended.
-		assert.deepEqual(resolved, [
-			{ t: startTs, type: "start" },
-			{ t: startTs + 20 * H, type: "stop" },
-			{ t: startTs + 20 * H, type: "start" },
-			{ t: startTs + 40 * H, type: "stop" },
-			{ t: startTs + 40 * H, type: "start" },
-			{ t: startTs + 60 * H, type: "stop" },
-		])
-
-		const summary = summarize(
-			{
-				id: "test-doc",
-				settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-				events: resolved,
-			},
-			new Date(2026, 6, 16, 10, 0),
-		)
-		// Exactly 60h credited (35h target - 60h = -25h) - not the ~24h the
-		// interleaving bug produced, nor a clamped ~56h.
-		assert.equal(summary.weeklyWorkedSec, 60 * H)
-		assert.equal(summary.weeklyRemainingSec, -25 * H)
-	})
-
-	test("leaves the dangling start's own day untouched when only a later day is answered with a skip flag", () => {
-		// Regression for: checking "Did not work" for a later day (e.g.
-		// Wednesday) and saving must not silently resolve an earlier,
-		// still-unanswered dangling start (e.g. Tuesday) as "0 hours" - a
-		// skipDay marker is a pure no-op, so it can never force-close it.
-		const startTs = toSec(new Date(2026, 6, 14, 9, 0)) // Tuesday 09:00
-		const events = [{ t: startTs, type: "start" as const }]
-		const days = [new Date(2026, 6, 14), new Date(2026, 6, 15)] // Tue, Wed
-
-		const resolved = resolveCatchup(events, days, [0, 0], [false, true])
-
-		assert.deepEqual(resolved, [
-			{ t: startTs, type: "start" }, // Tuesday's dangling start, untouched
-			{ t: toSec(new Date(2026, 6, 15)), type: "skipDay" }, // Wednesday
-		])
-		assert.equal(isRunning(resolved), true)
-	})
-
-	test("a partial save keeps demanding the dangling day's own answer, and a later save resolves it with real hours at its original timestamp", () => {
-		// Mirrors the "forgot-stop" example: Monday worked normally, Tuesday
-		// started but was never stopped.
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" as const },
-		]
-		const tueStartTs = toSec(new Date(2026, 6, 14, 9, 0))
-		const now = new Date(2026, 6, 17, 9, 30) // Friday
-
-		// Round 1: only answer Wednesday ("Did not work"), leave Tuesday and
-		// Thursday unanswered.
-		const days1 = weeklyEntryDays(events, now)
-		assert.deepEqual(
-			days1.map((d) => d.getTime()),
-			[14, 15, 16].map((date) => new Date(2026, 6, date).getTime()),
-		)
-		const round1 = resolveCatchup(
-			events,
-			days1,
-			[0, 0, 0],
-			[false, true, false],
-		)
-
-		// Tuesday's dangling start is still open, so it - and Thursday - must
-		// still be pending, even though Wednesday is chronologically after
-		// both of them.
-		const days2 = weeklyEntryDays(round1, now)
-		assert.deepEqual(
-			days2.map((d) => d.getTime()),
-			[14, 16].map((date) => new Date(2026, 6, date).getTime()),
-		)
-
-		// Round 2: now answer Tuesday with real hours.
-		const round2 = resolveCatchup(round1, days2, [360, 0], [false, false])
-
-		assert.deepEqual(round2, [
-			...events.slice(0, 2), // Monday's pair, untouched
-			{ t: tueStartTs, type: "start" }, // original timestamp preserved
-			{ t: toSec(new Date(2026, 6, 15)), type: "skipDay" }, // from round 1
-			{ t: tueStartTs + 360 * 60, type: "stop" }, // added in round 2
-		])
-		assert.equal(isRunning(round2), false)
-		// Thursday alone remains pending.
-		assert.deepEqual(
-			weeklyEntryDays(round2, now).map((d) => d.getTime()),
-			[new Date(2026, 6, 16).getTime()],
-		)
-	})
-
-	test("a partial skip on a later day doesn't let a stale dangling session bleed into other still-blank days", () => {
-		// Monday's session was never stopped; Wednesday gets answered first
-		// ("Did not work"), leaving Tuesday (blank) and the Monday dangling
-		// day both still needing an answer. Tuesday must read as genuinely
-		// blank (0 worked seconds), not inflated by Monday's stale bleed.
-		const startTs = toSec(new Date(2026, 6, 13, 9, 0)) // Monday 09:00
-		const events = [{ t: startTs, type: "start" as const }]
-		const now = new Date(2026, 6, 16, 10, 0) // Thursday
-
-		const resolved = resolveCatchup(
-			events,
-			[new Date(2026, 6, 15)], // Wednesday only
-			[0],
-			[true],
-		)
-
-		const breakdown = weeklyBreakdown(resolved, now)
-		assert.equal(breakdown[1]?.workedSec, 0) // Tuesday: blank, not bled-into
-		assert.deepEqual(
-			weeklyEntryDays(resolved, now).map((d) => d.getTime()),
-			[13, 14].map((date) => new Date(2026, 6, date).getTime()), // Mon, Tue
-		)
-	})
-})
-
-describe("editDay", () => {
-	const day = new Date(2026, 6, 13) // Monday
-
-	test("appends a positive adjust event when the entered total is higher", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-		]
-		// Current: 8h. Entered: 8h30m -> +30min.
-		assert.deepEqual(editDay(events, day, 8 * 60 + 30, 8 * H), [
-			...events,
-			{ t: toSec(day), type: "adjust", minutes: 30 },
-		])
-	})
-
-	test("appends a negative adjust event when the entered total is lower", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-		]
-		// Current: 8h. Entered: 6h -> -2h.
-		assert.deepEqual(editDay(events, day, 6 * 60, 8 * H), [
-			...events,
-			{ t: toSec(day), type: "adjust", minutes: -120 },
-		])
-	})
-
-	test("appends nothing when the entered total already matches", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-		]
-		assert.deepEqual(editDay(events, day, 8 * 60, 8 * H), events)
-	})
-
-	test("never touches the original start/stop events, only appends", () => {
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 12, 0)), type: "stop" as const },
-			{ t: toSec(new Date(2026, 6, 13, 13, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-		]
-		const result = editDay(events, day, 10 * 60, 8 * H)
-		assert.deepEqual(result.slice(0, events.length), events)
-		assert.equal(result.length, events.length + 1)
-	})
-
-	test("adding hours to a previously-blank day (e.g. a worked weekend) appends a fresh adjust", () => {
-		assert.deepEqual(editDay([], day, 90, 0), [
-			{ t: toSec(day), type: "adjust", minutes: 90 },
-		])
-	})
-
-	test("a second edit computes its delta from the already-adjusted total", () => {
-		const events = [{ t: toSec(day), type: "adjust" as const, minutes: 30 }]
-		// Caller passes the up-to-date total (8h30m) after the first edit.
-		assert.deepEqual(editDay(events, day, 9 * 60, 8 * H + 30 * 60), [
-			...events,
-			{ t: toSec(day), type: "adjust", minutes: 30 },
-		])
-	})
-})
-
-describe("workedSecondsInRange with adjust events", () => {
-	test("a positive adjust event within range adds its minutes", () => {
-		const day = new Date(2026, 6, 13)
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-			{ t: toSec(day), type: "adjust" as const, minutes: 30 },
-		]
-		const now = new Date(2026, 6, 13, 18, 0)
-		assert.equal(
-			workedSecondsInRange(events, day, dayEnd(day), now),
-			8 * H + 30 * 60,
-		)
-	})
-
-	test("a negative adjust event within range subtracts its minutes", () => {
-		const day = new Date(2026, 6, 13)
-		const events = [
-			{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" as const },
-			{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" as const },
-			{ t: toSec(day), type: "adjust" as const, minutes: -120 },
-		]
-		const now = new Date(2026, 6, 13, 18, 0)
-		assert.equal(workedSecondsInRange(events, day, dayEnd(day), now), 6 * H)
-	})
-
-	test("an adjust event on one day also folds into that week's total", () => {
-		const monday = new Date(2026, 6, 13)
-		const events = [{ t: toSec(monday), type: "adjust" as const, minutes: 90 }]
-		const now = new Date(2026, 6, 17, 12, 0)
-		const weekStart = startOfWeek(now)
-		const weekEnd = new Date(weekStart.getTime() + 7 * 24 * H * 1000)
-		assert.equal(workedSecondsInRange(events, weekStart, weekEnd, now), 90 * 60)
-	})
-
-	test("an adjust event outside the range is excluded", () => {
-		const monday = new Date(2026, 6, 13)
-		const tuesday = new Date(2026, 6, 14)
-		const events = [{ t: toSec(tuesday), type: "adjust" as const, minutes: 90 }]
-		const now = new Date(2026, 6, 14, 12, 0)
-		assert.equal(workedSecondsInRange(events, monday, dayEnd(monday), now), 0)
-	})
-})
-
-describe("startOfWeek", () => {
-	test("is Monday 00:00 for a Wednesday", () => {
-		const wednesday = new Date(2026, 6, 15, 13, 30) // 2026-07-15 is a Wednesday
-		const monday = startOfWeek(wednesday)
-		assert.equal(monday.getDay(), 1)
-		assert.equal(monday.getHours(), 0)
-		assert.equal(monday.getDate(), 13)
-	})
-
-	test("Sunday belongs to the preceding week", () => {
-		const sunday = new Date(2026, 6, 19, 8, 0) // 2026-07-19 is a Sunday
-		const monday = startOfWeek(sunday)
-		assert.equal(monday.getDate(), 13)
+		assert.deepEqual(booked.blocks, [{ start: null, end: null }])
+		assert.equal(booked.buchungen.length, 2)
+		assert.equal(booked.buchungen[0]?.depotAfterSec, 5 * 60)
+		assert.equal(depotSec(booked), 5 * 60 + (worked - 7 * H))
 	})
 })
 
 describe("summarize", () => {
-	test("computes daily and weekly remaining time from events", () => {
+	test("bundles the running state, worked/depot time, and Feierabend consistently", () => {
 		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [
-				{ t: 0, type: "start" },
-				{ t: 4 * H, type: "stop" },
-			],
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: null }],
+			buchungen: [{ t: -1, workedSec: 1 * H, bookingSec: 1 * H, depotAfterSec: 30 * 60 }],
 		}
-		const summary = summarize(data, new Date(4 * H * 1000))
-
-		assert.equal(summary.isRunning, false)
-		assert.equal(summary.startedAt, 0)
-		assert.equal(summary.dailyWorkedSec, 4 * H)
-		assert.equal(summary.dailyRemainingSec, (9 * 60 + 55) * 60 - 4 * H)
-		assert.equal(summary.weeklyWorkedSec, 4 * H)
-		assert.equal(summary.weeklyRemainingSec, 35 * 60 * 60 - 4 * H)
-	})
-
-	test("reflects an in-progress session live via `now`, including its start time", () => {
-		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [{ t: 0, type: "start" }],
-		}
-		const summary = summarize(data, new Date(1 * H * 1000))
+		const now = 2 * H
+		const summary = summarize(data, new Date(now * 1000))
 
 		assert.equal(summary.isRunning, true)
-		assert.equal(summary.startedAt, 0)
-		assert.equal(summary.dailyWorkedSec, 1 * H)
-	})
-
-	test("startedAt is null when tracking has never started", () => {
-		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [],
-		}
-		assert.equal(summarize(data, new Date(0)).startedAt, null)
-	})
-
-	test("startedAt stays pinned to today's first start across a stop/restart (e.g. lunch break)", () => {
-		const morningStart = toSec(new Date(2026, 6, 15, 9, 0))
-		const lunchStop = toSec(new Date(2026, 6, 15, 12, 0))
-		const afternoonStart = toSec(new Date(2026, 6, 15, 13, 0))
-		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [
-				{ t: morningStart, type: "start" },
-				{ t: lunchStop, type: "stop" },
-				{ t: afternoonStart, type: "start" },
-			],
-		}
-		const summary = summarize(data, new Date(2026, 6, 15, 14, 0))
-
-		assert.equal(summary.isRunning, true)
-		assert.equal(summary.startedAt, morningStart)
-	})
-
-	test("startedAt is null if nothing has started today, even after yesterday's activity", () => {
-		const yesterdayStart = toSec(new Date(2026, 6, 14, 9, 0))
-		const yesterdayStop = toSec(new Date(2026, 6, 14, 17, 0))
-		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [
-				{ t: yesterdayStart, type: "start" },
-				{ t: yesterdayStop, type: "stop" },
-			],
-		}
-		const summary = summarize(data, new Date(2026, 6, 15, 8, 0))
-
-		assert.equal(summary.startedAt, null)
-	})
-
-	test("dailyRemainingSec floors at 0 once the week's target is already met, even if today has no work yet", () => {
-		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [
-				// 72h logged Mon 09:00 -> Thu 09:00, already well over the 35h target.
-				{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" },
-				{ t: toSec(new Date(2026, 6, 16, 9, 0)), type: "stop" },
-			],
-		}
-		// Friday, nothing logged yet today.
-		const summary = summarize(data, new Date(2026, 6, 17, 10, 0))
-
-		assert.ok(summary.weeklyRemainingSec < 0)
-		assert.equal(summary.dailyRemainingSec, 0)
-	})
-
-	test("dailyRemainingSec keeps a real same-day overage even when the week is also already over", () => {
-		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [
-				// 72h logged Mon 09:00 -> Thu 09:00, plus 12h logged today
-				// (Friday) - both the week and today's own daily max are
-				// individually blown.
-				{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" },
-				{ t: toSec(new Date(2026, 6, 16, 9, 0)), type: "stop" },
-				{ t: toSec(new Date(2026, 6, 17, 8, 0)), type: "start" },
-				{ t: toSec(new Date(2026, 6, 17, 20, 0)), type: "stop" },
-			],
-		}
-		const summary = summarize(data, new Date(2026, 6, 17, 21, 0))
-
-		const dailyMaxSec = (9 * 60 + 55) * 60
-		assert.ok(summary.weeklyRemainingSec < 0)
-		assert.equal(summary.dailyRemainingSec, dailyMaxSec - 12 * H)
-	})
-
-	test("dailyRemainingSec is unaffected while the week still has time left", () => {
-		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [],
-		}
-		const summary = summarize(data, new Date(2026, 6, 17, 10, 0))
-
-		assert.ok(summary.weeklyRemainingSec > 0)
-		assert.equal(summary.dailyRemainingSec, (9 * 60 + 55) * 60)
-	})
-
-	test("excludes a stale open session (started before today) entirely, including its bleed into today", () => {
-		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [
-				// A real, closed Monday: worked normally, should still count.
-				{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" },
-				{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" },
-				// Forgotten open start on Tuesday, still "running" Friday
-				// morning — none of this should count anywhere, including
-				// today, until the user resolves it via catch-up.
-				{ t: toSec(new Date(2026, 6, 14, 9, 0)), type: "start" },
-			],
-		}
-		const summary = summarize(data, new Date(2026, 6, 17, 9, 30))
-
-		assert.equal(summary.dailyWorkedSec, 0)
-		assert.equal(summary.dailyRemainingSec, (9 * 60 + 55) * 60)
-		assert.equal(summary.weeklyWorkedSec, 8 * H)
-		assert.equal(summary.weeklyRemainingSec, 35 * H - 8 * H)
-	})
-
-	test("still counts a session that genuinely started today, even while an earlier gap is unresolved", () => {
-		const data: TrackingData = {
-			id: "test-doc",
-			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
-			events: [
-				// A closed stop yesterday leaves Wednesday as a plain gap day
-				// (no open session at all) rather than a stale open one.
-				{ t: toSec(new Date(2026, 6, 13, 9, 0)), type: "start" },
-				{ t: toSec(new Date(2026, 6, 13, 17, 0)), type: "stop" },
-				// Genuinely started today (Friday) — this is real, live work.
-				{ t: toSec(new Date(2026, 6, 17, 8, 0)), type: "start" },
-			],
-		}
-		const summary = summarize(data, new Date(2026, 6, 17, 9, 30))
-
-		assert.equal(summary.dailyWorkedSec, 1.5 * H)
+		assert.equal(summary.workedSec, 2 * H)
+		assert.equal(summary.depotSec, 30 * 60)
+		assert.equal(summary.feierabendSec, now + 7 * H - 30 * 60 - 2 * H)
+		assert.equal(summary.defaultBookingSec, 2 * H)
 	})
 })
