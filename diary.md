@@ -245,3 +245,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 80. Settings screen from home; fix PWA 100vh layout bug; numeric keypad
     `(edit app.tsx/app.css/de.ts/e2e.spec.ts: settings view, dvh, inputmode)`
+
+81. Redesign spec: drop weekly model for day/block/depot + Feierabend time
+    `(edit requirements.md: replace weekly target/breakdown with new model)`
