@@ -266,3 +266,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 87. Validate booking time <= daily max; native tooltip error (req #11)
     `(edit app.tsx: syncBookingTimeValidity on h/m inputs; e2e.spec.ts; de.ts)`
+
+88. Move Buchungszeit/Buchen form to page bottom, below sync status
+    `(edit app.tsx: reorder booking-form after footer in TrackingScreen)`

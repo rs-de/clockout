@@ -1032,6 +1032,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 				>
 					{summary.isRunning ? t("Stop") : t("Start")}
 				</button>
+				{footer}
 				<form
 					class="booking-form"
 					mix={on("submit", (event) => {
@@ -1101,7 +1102,6 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 						{t("Book")}
 					</button>
 				</form>
-				{footer}
 			</div>
 		)
 	}
