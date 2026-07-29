@@ -115,6 +115,7 @@ test("completing a block auto-appends a new one, and Buchen banks overtime to th
 	// The booking field defaults to the day's worked time (8h), capped at
 	// the daily max — submitting it banks the 1h over the 7h minimum.
 	await expect(page.locator('input[name="bookingHours"]')).toHaveValue("8")
+	await expect(page.getByText("Depot after booking: 1h 00m")).toBeVisible()
 	await page.getByRole("button", { name: "Book" }).click()
 
 	await expect(page.getByText("Depot: 1h 00m")).toBeVisible()
@@ -190,6 +191,7 @@ test("a short day's booking time is topped up from the depot, capped at what's a
 	// borrowed hour was actually worked past the minimum, so nothing offsets it.
 	await bookingHours.fill("3")
 	await bookingMinutes.fill("0")
+	await expect(page.getByText("Depot after booking: 0h 00m")).toBeVisible()
 	await page.getByRole("button", { name: "Book" }).click()
 	await expect(page.getByText("Depot: 0h 00m")).toBeVisible()
 })

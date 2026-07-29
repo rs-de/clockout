@@ -13,6 +13,7 @@ import {
 	formatDuration,
 	isRunning,
 	MIN_SESSION_SEC,
+	previewDepotAfterBooking,
 	quittingTimeSec,
 	setBlockField,
 	startBlock,
@@ -513,6 +514,56 @@ describe("bookDay", () => {
 		assert.equal(booked.bookings.length, 2)
 		assert.equal(booked.bookings[0]?.depotAfterSec, 5 * 60)
 		assert.equal(depotSec(booked), 5 * 60 + (worked - 7 * H))
+	})
+})
+
+describe("previewDepotAfterBooking", () => {
+	test("matches bookDay's resulting depot for the same inputs, without mutating", () => {
+		const worked = 8.5 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			bookings: [],
+		}
+		const bookingSec = defaultBookingSec(data, worked)
+		assert.equal(
+			previewDepotAfterBooking(data, bookingSec, worked),
+			depotSec(bookDay(data, bookingSec, worked)),
+		)
+		// Preview must not have touched the original data.
+		assert.equal(data.bookings.length, 0)
+	})
+
+	test("matches bookDay when topping up a short day from the depot", () => {
+		const worked = 5 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			bookings: [
+				{ t: -1, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 3 * H },
+			],
+		}
+		const bookingSec = defaultBookingSec(data, worked)
+		assert.equal(
+			previewDepotAfterBooking(data, bookingSec, worked),
+			depotSec(bookDay(data, bookingSec, worked)),
+		)
+	})
+
+	test("matches bookDay's clamp when bookingSec exceeds worked plus depot", () => {
+		const worked = 3 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			bookings: [],
+		}
+		assert.equal(
+			previewDepotAfterBooking(data, 100 * H, worked),
+			depotSec(bookDay(data, 100 * H, worked)),
+		)
 	})
 })
 

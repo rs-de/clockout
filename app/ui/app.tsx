@@ -28,6 +28,7 @@ import {
 	createTrackingData,
 	type DateFormat,
 	formatDuration,
+	previewDepotAfterBooking,
 	startBlock,
 	stopBlock,
 	summarize,
@@ -191,6 +192,34 @@ function syncBookingTimeValidity(
 			: ""
 	hours.setCustomValidity(message)
 	minutes.setCustomValidity(message)
+}
+
+/**
+ * Live "what would this booking do to the depot" line under the booking
+ * inputs — reads the form directly and writes the preview text via the DOM,
+ * same as `syncBookingTimeValidity` above, so typing doesn't trigger a full
+ * re-render.
+ */
+function syncBookingDepotPreview(
+	form: HTMLFormElement | null,
+	data: TrackingData,
+	nowSec: number,
+	t: Translator,
+) {
+	if (!form) return
+	const hours = form.elements.namedItem("bookingHours") as HTMLInputElement
+	const minutes = form.elements.namedItem("bookingMinutes") as HTMLInputElement
+	const bookingSec =
+		(Number(hours.value) || 0) * 3600 + (Number(minutes.value) || 0) * 60
+	const preview = form.querySelector<HTMLParagraphElement>(
+		"#booking-depot-preview",
+	)
+	if (!preview) return
+	preview.textContent = t("Depot after booking: {duration}", {
+		duration: formatDuration(
+			previewDepotAfterBooking(data, bookingSec, nowSec),
+		),
+	})
 }
 
 // Explicitly asks Chrome-family browsers to offer saving this password,
@@ -1075,13 +1104,19 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 									on("mouseup", (event) =>
 										reassertSelectOnMouseUp(event.currentTarget, event),
 									),
-									on("input", (event) =>
+									on("input", (event) => {
 										syncBookingTimeValidity(
 											event.currentTarget.form,
 											maxBookingSec,
 											t,
-										),
-									),
+										)
+										syncBookingDepotPreview(
+											event.currentTarget.form,
+											data,
+											nowSec,
+											t,
+										)
+									}),
 								]}
 							/>
 							<span class="unit" aria-hidden="true">
@@ -1100,19 +1135,37 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 									on("mouseup", (event) =>
 										reassertSelectOnMouseUp(event.currentTarget, event),
 									),
-									on("input", (event) =>
+									on("input", (event) => {
 										syncBookingTimeValidity(
 											event.currentTarget.form,
 											maxBookingSec,
 											t,
-										),
-									),
+										)
+										syncBookingDepotPreview(
+											event.currentTarget.form,
+											data,
+											nowSec,
+											t,
+										)
+									}),
 								]}
 							/>
 							<span class="unit" aria-hidden="true">
 								{t("m")}
 							</span>
 						</div>
+						<p class="field-hint" id="booking-depot-preview">
+							{t("Depot after booking: {duration}", {
+								duration: formatDuration(
+									previewDepotAfterBooking(
+										data,
+										defaultBookingHours * 3600 +
+											defaultBookingRemainderMinutes * 60,
+										nowSec,
+									),
+								),
+							})}
+						</p>
 					</fieldset>
 					<button type="submit" class="btn btn-primary">
 						{t("Book")}

@@ -19,6 +19,7 @@ export const de: Record<string, string> = {
 	"Date format": "Datumsformat",
 	'Demo: simulating "{name}" — {dateTime}. Nothing here is saved.':
 		'Demo: Simulation von "{name}" — {dateTime}. Hier wird nichts gespeichert.',
+	"Depot after booking: {duration}": "Depot nach Buchung: {duration}",
 	"Depot: {duration}": "Depot: {duration}",
 	End: "Ende",
 	Examples: "Beispiele",

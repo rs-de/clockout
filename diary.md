@@ -284,3 +284,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 93. Block edits commit via form submit, not per-keystroke change
     `(add applyBlockEdits; app.tsx: block-form + Save button; tests)`
+
+94. Live-preview the depot balance a booking would produce
+    `(edit time-tracking.ts: previewDepotAfterBooking; app.tsx/de.ts/tests)`

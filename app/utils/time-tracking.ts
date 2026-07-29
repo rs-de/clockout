@@ -235,12 +235,15 @@ export function defaultBookingSec(data: TrackingData, nowSec: number): number {
 }
 
 /**
- * Closes out the current day (requirement #11). `bookingSec` is clamped to
- * `[0, min(workedSec + depotAvailable, dailyMax)]` here too — not just via
- * the input's `min`/`max` — so a bypassed form (devtools, a future
- * regression) can't poison the depot with a value that implies more was
- * booked than was actually worked plus what the depot could cover, or more
- * than the configured max.
+ * The depot math behind `bookDay`, factored out so the live booking-form
+ * preview (app.tsx) can show what a booking *would* do without committing
+ * it — same clamp, same delta, just not applied.
+ *
+ * `bookingSec` is clamped to `[0, min(workedSec + depotAvailable, dailyMax)]`
+ * here — not just via the input's `min`/`max` — so a bypassed form
+ * (devtools, a future regression) can't poison the depot with a value that
+ * implies more was booked than was actually worked plus what the depot
+ * could cover, or more than the configured max.
  *
  * Booking beyond `workedSec` tops the day up from the depot instead of
  * inventing time — the gap (`clampedBookingSec - overlapWithWorked`) draws
@@ -256,11 +259,11 @@ export function defaultBookingSec(data: TrackingData, nowSec: number): number {
  * it (a day worked at or above the minimum, booked at or under what was
  * worked, still only ever grows it, same as before).
  */
-export function bookDay(
+function bookingDelta(
 	data: TrackingData,
 	bookingSec: number,
 	nowSec: number,
-): TrackingData {
+): { worked: number; clampedBookingSec: number; depotDelta: number } {
 	const worked = workedSec(data.blocks, nowSec)
 	const dailyMinSec = data.settings.dailyMinimum * 60
 	const dailyMaxSec = data.settings.dailyMax * 60
@@ -271,10 +274,25 @@ export function bookDay(
 	)
 	const overlapWithWorked = Math.min(clampedBookingSec, worked)
 	const drawnFromDepot = Math.max(0, clampedBookingSec - worked)
-	const delta =
+	const depotDelta =
 		Math.max(0, overlapWithWorked - dailyMinSec) +
 		(worked - overlapWithWorked) -
 		drawnFromDepot
+	return { worked, clampedBookingSec, depotDelta }
+}
+
+/** Closes out the current day (requirement #11). See `bookingDelta` for the
+ * clamp/delta math. */
+export function bookDay(
+	data: TrackingData,
+	bookingSec: number,
+	nowSec: number,
+): TrackingData {
+	const { worked, clampedBookingSec, depotDelta } = bookingDelta(
+		data,
+		bookingSec,
+		nowSec,
+	)
 
 	return {
 		...data,
@@ -285,10 +303,20 @@ export function bookDay(
 				t: nowSec,
 				workedSec: worked,
 				bookingSec: clampedBookingSec,
-				depotAfterSec: depotSec(data) + delta,
+				depotAfterSec: depotSec(data) + depotDelta,
 			},
 		],
 	}
+}
+
+/** The depot balance that would result if `bookingSec` were booked right
+ * now — for the booking form's live preview. Doesn't mutate anything. */
+export function previewDepotAfterBooking(
+	data: TrackingData,
+	bookingSec: number,
+	nowSec: number,
+): number {
+	return depotSec(data) + bookingDelta(data, bookingSec, nowSec).depotDelta
 }
 
 export type TrackingSummary = {
