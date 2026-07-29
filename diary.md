@@ -275,3 +275,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 90. Drop per-block duration; center block-row and booking-time inputs
     `(edit app.tsx/app.css: rm .block-duration span+rule; hm-row centering)`
+
+91. Shrink number/time inputs to content width; drop time picker icon
+    `(edit app.css: input[number] 2.5rem, input[time] 3.25rem, no icon)`

@@ -462,8 +462,21 @@ select {
 }
 
 input[type="number"] {
-	width: 3.5rem;
+	/* Fits exactly 2 digits (the largest value any of these fields ever
+	   holds — hours max at 23, minutes at 59), not an arbitrary wider box. */
+	width: 2.5rem;
 	text-align: right;
+}
+
+input[type="time"] {
+	/* Fits "HH:MM" (5 characters incl. the colon), not the browser's much
+	   wider default — freed up further by dropping the picker icon below,
+	   since both fields are directly editable by typing anyway (req #7). */
+	width: 3.25rem;
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+	display: none;
 }
 
 input:focus,
