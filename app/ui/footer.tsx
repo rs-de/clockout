@@ -50,7 +50,14 @@ export function Footer(handle: Handle<{ t: Translator }>) {
 							/>
 						</svg>
 					</a>
-					|<span>v{pkg.version}</span>
+					|
+					<a
+						href="https://github.com/rs-de/clockout/blob/main/CHANGELOG.md"
+						target="_blank"
+						rel="noreferrer"
+					>
+						v{pkg.version}
+					</a>
 				</div>
 			</footer>
 		)

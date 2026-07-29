@@ -302,3 +302,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 99. Add CHANGELOG.md, preparing an Unreleased section for the next minor
     `(add CHANGELOG.md: Keep a Changelog format, v0.2.5...HEAD summary)`
+
+100. Link the footer's version number to CHANGELOG.md on GitHub
+     `(edit footer.tsx: v{pkg.version} as <a> to blob/main/CHANGELOG.md)`
