@@ -299,3 +299,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 98. Show a one-time banner when a legacy doc got reset to fresh
     `(edit app.tsx: legacyDataReset + time-banner; de.ts: new string)`
+
+99. Add CHANGELOG.md, preparing an Unreleased section for the next minor
+    `(add CHANGELOG.md: Keep a Changelog format, v0.2.5...HEAD summary)`
