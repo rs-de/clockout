@@ -8,8 +8,8 @@ export const de: Record<string, string> = {
 	"Back to examples": "Zurück zu den Beispielen",
 	Book: "Buchen",
 	"Booking time": "Buchungszeit",
-	"Booking time can't exceed the daily max ({max}).":
-		"Buchungszeit darf die maximale Tagesarbeitszeit ({max}) nicht überschreiten.",
+	"Booking time can't exceed {max}.":
+		"Buchungszeit darf {max} nicht überschreiten.",
 	"Browser default": "Browserstandard",
 	Cancel: "Abbrechen",
 	"ClockOut is a lean, private time tracker: clock in, clock out, and see at a glance when you're done for the day — plus a depot that banks any overtime. No account needed — your data is encrypted in your browser before it's synced, so only you can unlock it. Try one of the example scenarios below to see it in action.":

@@ -120,9 +120,10 @@ test("booking time can't exceed the daily max; native validation blocks submit",
 }) => {
 	await setUpTracking(page)
 
-	// No block/start-stop entry needed — the daily-max check only looks at
-	// the booking form's own hours/minutes fields against settings.dailyMax
-	// (9h55m default), independent of what's actually been worked.
+	// Worked well past the daily max, so the max itself — not worked time —
+	// is the binding ceiling this test is exercising.
+	await fillBlock(page, 0, "07:00", "18:00")
+
 	const bookingHours = page.locator('input[name="bookingHours"]')
 	const bookingMinutes = page.locator('input[name="bookingMinutes"]')
 	await bookingHours.fill("10")
@@ -134,7 +135,7 @@ test("booking time can't exceed the daily max; native validation blocks submit",
 	await expect(bookingHours).toHaveValue("10")
 	await expect(bookingHours).toHaveJSProperty(
 		"validationMessage",
-		"Booking time can't exceed the daily max (9h 55m).",
+		"Booking time can't exceed 9h 55m.",
 	)
 
 	// Back within range: submit goes through (proven by the sync status
@@ -143,6 +144,44 @@ test("booking time can't exceed the daily max; native validation blocks submit",
 	await bookingMinutes.fill("55")
 	await page.getByRole("button", { name: "Book" }).click()
 	await expect(page.getByRole("status")).toHaveText("Synced")
+})
+
+test("a short day's booking time is topped up from the depot, capped at what's available", async ({
+	page,
+}) => {
+	await setUpTracking(page)
+
+	// Bank 1h of depot: an 8h day is 1h over the 7h minimum.
+	await fillBlock(page, 0, "09:00", "17:00")
+	await page.getByRole("button", { name: "Book" }).click()
+	await expect(page.getByText("Depot: 1h 00m")).toBeVisible()
+
+	// A short 2h day next — reload so the booking field's default (only set
+	// via defaultValue at mount) actually reflects the fresh state, the same
+	// way a real user would see it after reopening the app.
+	await fillBlock(page, 0, "09:00", "11:00")
+	await page.reload()
+
+	const bookingHours = page.locator('input[name="bookingHours"]')
+	const bookingMinutes = page.locator('input[name="bookingMinutes"]')
+	// Topped up to 2h worked + the 1h banked depot = 3h, not just the 2h
+	// actually worked.
+	await expect(bookingHours).toHaveValue("3")
+	await expect(bookingMinutes).toHaveValue("0")
+
+	// Can't stretch further than what the depot actually covers.
+	await bookingHours.fill("4")
+	await expect(bookingHours).toHaveJSProperty(
+		"validationMessage",
+		"Booking time can't exceed 3h 00m.",
+	)
+
+	// Booking the topped-up 3h draws the depot back down to 0 — none of the
+	// borrowed hour was actually worked past the minimum, so nothing offsets it.
+	await bookingHours.fill("3")
+	await bookingMinutes.fill("0")
+	await page.getByRole("button", { name: "Book" }).click()
+	await expect(page.getByText("Depot: 0h 00m")).toBeVisible()
 })
 
 test("clicking the logo from an example re-resolves the view instead of freezing it", async ({

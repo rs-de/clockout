@@ -155,14 +155,19 @@ function syncPasswordMatchValidity(
 }
 
 /**
- * Same reasoning as `syncPasswordMatchValidity` above: the daily-max cap
+ * Same reasoning as `syncPasswordMatchValidity` above: the effective cap
  * isn't expressible via the hours/minutes inputs' own `min`/`max`, since the
  * constraint is on their *combined* total, not either field alone (a 23h max
  * on the hours field alone would still let e.g. 9h55m tip over to 10h00m).
+ *
+ * `maxBookingSec` is the caller's already-computed `min(dailyMax, workedSec
+ * + depotAvailable)` — not just the daily max — since a short day can only
+ * be topped up as far as the depot actually covers (see
+ * `defaultBookingSec`/`bookDay` in time-tracking.ts).
  */
 function syncBookingTimeValidity(
 	form: HTMLFormElement | null,
-	dailyMaxSec: number,
+	maxBookingSec: number,
 	t: Translator,
 ) {
 	if (!form) return
@@ -171,9 +176,9 @@ function syncBookingTimeValidity(
 	const totalSec =
 		(Number(hours.value) || 0) * 3600 + (Number(minutes.value) || 0) * 60
 	const message =
-		totalSec > dailyMaxSec
-			? t("Booking time can't exceed the daily max ({max}).", {
-					max: formatDuration(dailyMaxSec),
+		totalSec > maxBookingSec
+			? t("Booking time can't exceed {max}.", {
+					max: formatDuration(maxBookingSec),
 				})
 			: ""
 	hours.setCustomValidity(message)
@@ -962,7 +967,13 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 		const defaultBookingMinutes = Math.round(summary.defaultBookingSec / 60)
 		const defaultBookingHours = Math.floor(defaultBookingMinutes / 60)
 		const defaultBookingRemainderMinutes = defaultBookingMinutes % 60
-		const dailyMaxSec = data.settings.dailyMax * 60
+		// Same ceiling bookDay() itself clamps to (time-tracking.ts): a short
+		// day can only be topped up as far as the depot actually covers, not
+		// unconditionally up to the daily max.
+		const maxBookingSec = Math.min(
+			data.settings.dailyMax * 60,
+			summary.workedSec + Math.max(0, summary.depotSec),
+		)
 
 		return (
 			<div class="time-page">
@@ -1056,7 +1067,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 									on("input", (event) =>
 										syncBookingTimeValidity(
 											event.currentTarget.form,
-											dailyMaxSec,
+											maxBookingSec,
 											t,
 										),
 									),
@@ -1081,7 +1092,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 									on("input", (event) =>
 										syncBookingTimeValidity(
 											event.currentTarget.form,
-											dailyMaxSec,
+											maxBookingSec,
 											t,
 										),
 									),

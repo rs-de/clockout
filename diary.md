@@ -278,3 +278,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 91. Shrink number/time inputs to content width; drop time picker icon
     `(edit app.css: input[number] 2.5rem, input[time] 3.25rem, no icon)`
+
+92. Booking tops up short days from depot; drawdown decreases it (req11)
+    `(edit time-tracking.ts: defaultBookingSec/bookDay; app.tsx; tests)`

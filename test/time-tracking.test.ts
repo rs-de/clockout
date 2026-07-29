@@ -255,6 +255,30 @@ describe("defaultBookingSec", () => {
 		}
 		assert.equal(defaultBookingSec(data, 11 * H), (9 * 60 + 55) * 60)
 	})
+
+	test("tops up a short day with available depot", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: 5 * H }],
+			bookings: [
+				{ t: -1, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 1 * H },
+			],
+		}
+		assert.equal(defaultBookingSec(data, 5 * H), 6 * H)
+	})
+
+	test("caps the depot top-up at the daily max, not worked + full depot", () => {
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: 5 * H }],
+			bookings: [
+				{ t: -1, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 10 * H },
+			],
+		}
+		assert.equal(defaultBookingSec(data, 5 * H), (9 * 60 + 55) * 60)
+	})
 })
 
 describe("bookDay", () => {
@@ -333,6 +357,57 @@ describe("bookDay", () => {
 		assert.equal(booked.bookings.at(-1)?.bookingSec, worked)
 	})
 
+	test("a short day topped up from the depot draws it down by the gap", () => {
+		const worked = 5 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			bookings: [
+				{ t: -1, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 3 * H },
+			],
+		}
+		// Below dailyMin (7h) even after the top-up, so nothing is earned —
+		// the full 3h drawn from the depot to reach 8h is a straight deduction.
+		const booked = bookDay(data, defaultBookingSec(data, worked), worked)
+		assert.equal(booked.bookings.at(-1)?.bookingSec, 8 * H)
+		assert.equal(depotSec(booked), 0)
+	})
+
+	test("a top-up past the minimum nets earned overtime against the depot draw", () => {
+		const worked = 8 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			bookings: [
+				{ t: -1, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 2 * H },
+			],
+		}
+		// Booking the full daily max (9h55m) draws 1h55m from the depot to
+		// cover the gap above the 8h worked, but the 1h actually worked past
+		// the 7h minimum still earns credit — net -55m, not the full -1h55m.
+		const booked = bookDay(data, defaultBookingSec(data, worked), worked)
+		assert.equal(booked.bookings.at(-1)?.bookingSec, (9 * 60 + 55) * 60)
+		assert.equal(depotSec(booked), 2 * H - 55 * 60)
+	})
+
+	test("still clamps a bookingSec beyond worked time plus available depot", () => {
+		const worked = 3 * H
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: worked }],
+			bookings: [
+				{ t: -1, workedSec: 1 * H, bookingSec: 1 * H, depotAfterSec: 1 * H },
+			],
+		}
+		const booked = bookDay(data, 100 * H, worked)
+		// Clamped to worked (3h) + depot (1h) = 4h, well under the daily max.
+		assert.equal(booked.bookings.at(-1)?.bookingSec, 4 * H)
+		assert.equal(depotSec(booked), 0)
+	})
+
 	test("clamps a bookingSec above the daily max", () => {
 		const worked = 11 * H
 		const data: TrackingData = {
@@ -394,6 +469,7 @@ describe("summarize", () => {
 		assert.equal(summary.workedSec, 2 * H)
 		assert.equal(summary.depotSec, 30 * 60)
 		assert.equal(summary.quittingTimeSec, now + 7 * H - 30 * 60 - 2 * H)
-		assert.equal(summary.defaultBookingSec, 2 * H)
+		// Topped up with the 30m depot on top of the 2h worked.
+		assert.equal(summary.defaultBookingSec, 2 * H + 30 * 60)
 	})
 })

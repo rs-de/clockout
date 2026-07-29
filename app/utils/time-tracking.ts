@@ -37,7 +37,11 @@ export type Booking = {
 	t: number
 	/** The day's total worked time, before capping to `bookingSec`. */
 	workedSec: number
-	/** What was actually entered into the booking field (<= dailyMax). */
+	/** What was actually entered into the booking field — can exceed
+	 * `workedSec` (topped up from the depot), but never `dailyMax`, and
+	 * never more than the depot available at the time could cover. Whether
+	 * (and how much) this booking drew down the depot is only ever
+	 * knowable by comparing this to `workedSec`, never tracked separately. */
 	bookingSec: number
 	depotAfterSec: number
 }
@@ -177,24 +181,39 @@ export function quittingTimeSec(data: TrackingData, nowSec: number): number {
 	)
 }
 
-/** The booking field's default: today's worked time, capped at the daily max. */
+/**
+ * The booking field's default: today's worked time, topped up with
+ * available depot (if any) — e.g. leaving early on a short day, funded by
+ * banked overtime — capped at the daily max. Never invents time from
+ * nowhere: the top-up can't exceed what the depot actually holds.
+ */
 export function defaultBookingSec(data: TrackingData, nowSec: number): number {
-	return Math.min(workedSec(data.blocks, nowSec), data.settings.dailyMax * 60)
+	const worked = workedSec(data.blocks, nowSec)
+	const depotAvailable = Math.max(0, depotSec(data))
+	return Math.min(data.settings.dailyMax * 60, worked + depotAvailable)
 }
 
 /**
  * Closes out the current day (requirement #11). `bookingSec` is clamped to
- * `[0, min(workedTime, dailyMax)]` here too — not just via the input's
- * `min`/`max` — so a bypassed form (devtools, a future regression) can't
- * poison the depot with a value that implies more was booked than was
- * actually worked, or more than the configured max.
+ * `[0, min(workedSec + depotAvailable, dailyMax)]` here too — not just via
+ * the input's `min`/`max` — so a bypassed form (devtools, a future
+ * regression) can't poison the depot with a value that implies more was
+ * booked than was actually worked plus what the depot could cover, or more
+ * than the configured max.
  *
- * Depot delta is `max(0, bookingSec - dailyMin) + (workedSec - bookingSec)`:
- * the first term banks ordinary overtime on what got booked as today's
- * hours, the second banks whatever *isn't* booked (e.g. because it's over
- * the max) — together always equal to `workedSec - dailyMin` whenever
- * `bookingSec` is left at its default, and never negative, so the depot
- * only ever grows.
+ * Booking beyond `workedSec` tops the day up from the depot instead of
+ * inventing time — the gap (`clampedBookingSec - overlapWithWorked`) draws
+ * the depot down by exactly that much. On the actually-worked side,
+ * nothing changes from before: `max(0, overlapWithWorked - dailyMin) +
+ * (workedSec - overlapWithWorked)` still banks ordinary overtime on the
+ * worked portion that got booked, plus whatever worked time is left
+ * unbooked (e.g. because it's over the max) — together always
+ * `workedSec - dailyMin` whenever `bookingSec` is left at its (worked-time)
+ * default. The clamp above ensures the drawdown can never exceed the
+ * depot actually available, so it can never go negative — it just no
+ * longer *only* grows the way it did before this booking could dip into
+ * it (a day worked at or above the minimum, booked at or under what was
+ * worked, still only ever grows it, same as before).
  */
 export function bookDay(
 	data: TrackingData,
@@ -204,12 +223,17 @@ export function bookDay(
 	const worked = workedSec(data.blocks, nowSec)
 	const dailyMinSec = data.settings.dailyMinimum * 60
 	const dailyMaxSec = data.settings.dailyMax * 60
+	const depotAvailable = Math.max(0, depotSec(data))
 	const clampedBookingSec = Math.min(
 		Math.max(0, bookingSec),
-		Math.min(worked, dailyMaxSec),
+		Math.min(worked + depotAvailable, dailyMaxSec),
 	)
+	const overlapWithWorked = Math.min(clampedBookingSec, worked)
+	const drawnFromDepot = Math.max(0, clampedBookingSec - worked)
 	const delta =
-		Math.max(0, clampedBookingSec - dailyMinSec) + (worked - clampedBookingSec)
+		Math.max(0, overlapWithWorked - dailyMinSec) +
+		(worked - overlapWithWorked) -
+		drawnFromDepot
 
 	return {
 		...data,
@@ -241,14 +265,13 @@ export function summarize(
 	const nowSec = Math.floor(now.getTime() / 1000)
 	const worked = workedSec(data.blocks, nowSec)
 	const depot = depotSec(data)
-	const dailyMaxSec = data.settings.dailyMax * 60
 
 	return {
 		isRunning: isRunning(data.blocks),
 		workedSec: worked,
 		depotSec: depot,
 		quittingTimeSec: nowSec + data.settings.dailyMinimum * 60 - depot - worked,
-		defaultBookingSec: Math.min(worked, dailyMaxSec),
+		defaultBookingSec: defaultBookingSec(data, nowSec),
 	}
 }
 
