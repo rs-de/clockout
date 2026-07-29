@@ -396,6 +396,14 @@ fieldset > .field-hint {
 	margin-bottom: 1rem;
 }
 
+/* Same margin-collapse reasoning as .form-field > .field-hint above: zero
+   the element's own margin so .booking-form's flex `gap` is the only space
+   between it and the button above. */
+.booking-form > .field-hint {
+	margin: 0;
+	text-align: center;
+}
+
 .field-error {
 	margin: 0;
 	color: var(--color-stop);

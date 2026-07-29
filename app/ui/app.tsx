@@ -1154,22 +1154,22 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 								{t("m")}
 							</span>
 						</div>
-						<p class="field-hint" id="booking-depot-preview">
-							{t("Depot after booking: {duration}", {
-								duration: formatDuration(
-									previewDepotAfterBooking(
-										data,
-										defaultBookingHours * 3600 +
-											defaultBookingRemainderMinutes * 60,
-										nowSec,
-									),
-								),
-							})}
-						</p>
 					</fieldset>
 					<button type="submit" class="btn btn-primary">
 						{t("Book")}
 					</button>
+					<p class="field-hint" id="booking-depot-preview">
+						{t("Depot after booking: {duration}", {
+							duration: formatDuration(
+								previewDepotAfterBooking(
+									data,
+									defaultBookingHours * 3600 +
+										defaultBookingRemainderMinutes * 60,
+									nowSec,
+								),
+							),
+						})}
+					</p>
 				</form>
 			</div>
 		)
