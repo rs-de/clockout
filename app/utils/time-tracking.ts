@@ -84,9 +84,18 @@ export const MIN_SESSION_SEC = 60
 /**
  * A completed block shorter than MIN_SESSION_SEC is discarded back to empty
  * — as if the start never happened — rather than kept as a near-zero
- * session (requirement #10). Also catches an end typed before its start.
+ * session (requirement #10). Also catches an end typed before its start,
+ * and an end with no start at all — the end field is never disabled while
+ * start is empty (that was tried and reverted: a declarative `disabled`
+ * derived from committed state fights the live-clock's once-a-second
+ * re-render, which kept re-imposing it moments after a user's own typing
+ * had just enabled the field), so this is the only guard against a stray
+ * end-only block.
  */
 function normalizeBlock(block: Block): Block {
+	if (block.start === null && block.end !== null) {
+		return { start: null, end: null }
+	}
 	if (
 		block.start !== null &&
 		block.end !== null &&
@@ -101,17 +110,28 @@ function normalizeBlock(block: Block): Block {
  * Completing a block (its end gets filled) automatically appends a new,
  * empty block after it (requirement #7) — this is what keeps that
  * invariant true after any edit, not just the Start/Stop buttons.
+ *
+ * Also collapses away any *other* fully-empty block first — e.g. an earlier
+ * block manually cleared back to empty via the block-editing form
+ * (app.tsx's applyBlockEdits) — rather than leaving a second, meaningless
+ * empty row alongside the trailing one. An empty block conveys nothing on
+ * its own, so there's never a reason to keep more than the one the
+ * invariant already guarantees.
  */
 function ensureTrailingBlock(blocks: Block[]): Block[] {
-	const last = blocks.at(-1)
+	const lastIndex = blocks.length - 1
+	const collapsed = blocks.filter(
+		(block, i) => block.start !== null || block.end !== null || i === lastIndex,
+	)
+	const last = collapsed.at(-1)
 	if (!last || (last.start !== null && last.end !== null)) {
-		return [...blocks, { start: null, end: null }]
+		return [...collapsed, { start: null, end: null }]
 	}
-	return blocks
+	return collapsed
 }
 
 /** Sets one field of the block at `index` — the general primitive behind
- * both the Start/Stop buttons and manual correction of a block's time. */
+ * the Start/Stop buttons. */
 export function setBlockField(
 	blocks: Block[],
 	index: number,
@@ -121,6 +141,27 @@ export function setBlockField(
 	const updated = blocks.map((block, i) =>
 		i === index ? normalizeBlock({ ...block, [field]: value }) : block,
 	)
+	return ensureTrailingBlock(updated)
+}
+
+/**
+ * Applies a whole set of start/end edits at once — one entry per existing
+ * block, in order — the primitive behind manually correcting a block's time
+ * (requirement #7). A batch, not a per-field call like `setBlockField`,
+ * because a native `<input type="time">` fires `change` the moment both its
+ * segments hold *any* complete value, including one the user is still
+ * mid-typing (e.g. typing "3" while heading for "30" reads as "03" first);
+ * committing that immediately, one field at a time, would race the user's
+ * next keystroke. Reading the whole form only once, at actual submit,
+ * sidesteps that entirely. Each block's own normalize/discard rule
+ * (requirement #10) still applies individually, and the trailing-empty-block
+ * invariant is re-asserted once at the end, same as `setBlockField`.
+ */
+export function applyBlockEdits(
+	blocks: Block[],
+	edits: Array<{ start: number | null; end: number | null }>,
+): Block[] {
+	const updated = blocks.map((block, i) => normalizeBlock(edits[i] ?? block))
 	return ensureTrailingBlock(updated)
 }
 

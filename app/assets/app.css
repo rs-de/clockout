@@ -570,6 +570,12 @@ select:disabled {
 	justify-content: center;
 }
 
+.block-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
 .block-list {
 	display: flex;
 	flex-direction: column;

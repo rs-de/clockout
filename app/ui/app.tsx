@@ -22,12 +22,12 @@ import {
 } from "../utils/local-store.ts"
 import { createSyncEngine, type SyncStatus } from "../utils/sync-engine.ts"
 import {
+	applyBlockEdits,
 	type Block,
 	bookDay,
 	createTrackingData,
 	type DateFormat,
 	formatDuration,
-	setBlockField,
 	startBlock,
 	stopBlock,
 	summarize,
@@ -112,6 +112,14 @@ function parseTimeInput(value: string, nowSec: number): number | null {
 	const d = new Date(nowSec * 1000)
 	d.setHours(hours ?? 0, minutes ?? 0, 0, 0)
 	return Math.floor(d.getTime() / 1000)
+}
+
+/** `FormData.get()` returns `null` for a field that isn't present at all —
+ * read as `""` instead, so `parseTimeInput` treats it the same as an
+ * intentionally cleared field rather than the literal string `"null"`. */
+function formTimeValue(formData: FormData, name: string): string {
+	const value = formData.get(name)
+	return typeof value === "string" ? value : ""
 }
 
 function buildExampleView(example: Example): View {
@@ -409,13 +417,11 @@ export const App = clientEntry(
 			if (sessionKey) void syncEngine.sync(data, sessionKey)
 		}
 
-		async function handleBlockFieldChange(
+		async function handleBlockFormSubmit(
 			data: TrackingData,
-			index: number,
-			field: "start" | "end",
-			value: number | null,
+			edits: Array<{ start: number | null; end: number | null }>,
 		) {
-			data.blocks = setBlockField(data.blocks, index, field, value)
+			data.blocks = applyBlockEdits(data.blocks, edits)
 			await saveTrackingData(data)
 			handle.update()
 			if (sessionKey) void syncEngine.sync(data, sessionKey)
@@ -443,13 +449,11 @@ export const App = clientEntry(
 			handle.update()
 		}
 
-		function handleExampleBlockFieldChange(
+		function handleExampleBlockFormSubmit(
 			data: TrackingData,
-			index: number,
-			field: "start" | "end",
-			value: number | null,
+			edits: Array<{ start: number | null; end: number | null }>,
 		) {
-			data.blocks = setBlockField(data.blocks, index, field, value)
+			data.blocks = applyBlockEdits(data.blocks, edits)
 			handle.update()
 		}
 
@@ -880,8 +884,8 @@ export const App = clientEntry(
 						now={new Date()}
 						onStart={() => void handleStart(data)}
 						onStop={() => void handleStop(data)}
-						onBlockFieldChange={(index, field, value) =>
-							void handleBlockFieldChange(data, index, field, value)
+						onBlockFormSubmit={(edits) =>
+							void handleBlockFormSubmit(data, edits)
 						}
 						onBookDay={(bookingSec) => void handleBookDay(data, bookingSec)}
 						t={t}
@@ -909,8 +913,8 @@ export const App = clientEntry(
 					now={now}
 					onStart={() => handleExampleStart(data, now)}
 					onStop={() => handleExampleStop(data, now)}
-					onBlockFieldChange={(index, field, value) =>
-						handleExampleBlockFieldChange(data, index, field, value)
+					onBlockFormSubmit={(edits) =>
+						handleExampleBlockFormSubmit(data, edits)
 					}
 					onBookDay={(bookingSec) =>
 						handleExampleBookDay(data, bookingSec, now)
@@ -936,10 +940,8 @@ type TrackingScreenProps = {
 	now: Date
 	onStart: () => void
 	onStop: () => void
-	onBlockFieldChange: (
-		index: number,
-		field: "start" | "end",
-		value: number | null,
+	onBlockFormSubmit: (
+		edits: Array<{ start: number | null; end: number | null }>,
 	) => void
 	onBookDay: (bookingSec: number) => void
 	t: Translator
@@ -954,7 +956,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 			now,
 			onStart,
 			onStop,
-			onBlockFieldChange,
+			onBlockFormSubmit,
 			onBookDay,
 			t,
 			banner,
@@ -993,42 +995,51 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 						})}
 					</p>
 				</div>
-				<ul class="block-list">
-					{data.blocks.map((block: Block, i: number) => (
-						<li key={i} class="data-row block-row">
-							<div class="hm-row">
-								<input
-									key={`start-${i}-${block.start ?? "empty"}`}
-									type="time"
-									aria-label={t("Start")}
-									defaultValue={timeInputValue(block.start)}
-									mix={on("change", (event) => {
-										onBlockFieldChange(
-											i,
-											"start",
-											parseTimeInput(event.currentTarget.value, nowSec),
-										)
-									})}
-								/>
-								<span aria-hidden="true">–</span>
-								<input
-									key={`end-${i}-${block.end ?? "empty"}`}
-									type="time"
-									aria-label={t("End")}
-									disabled={block.start === null}
-									defaultValue={timeInputValue(block.end)}
-									mix={on("change", (event) => {
-										onBlockFieldChange(
-											i,
-											"end",
-											parseTimeInput(event.currentTarget.value, nowSec),
-										)
-									})}
-								/>
-							</div>
-						</li>
-					))}
-				</ul>
+				<form
+					class="block-form"
+					mix={on("submit", (event) => {
+						event.preventDefault()
+						const formData = new FormData(event.currentTarget)
+						const edits = data.blocks.map((_, i) => ({
+							start: parseTimeInput(
+								formTimeValue(formData, `block-${i}-start`),
+								nowSec,
+							),
+							end: parseTimeInput(
+								formTimeValue(formData, `block-${i}-end`),
+								nowSec,
+							),
+						}))
+						onBlockFormSubmit(edits)
+					})}
+				>
+					<ul class="block-list">
+						{data.blocks.map((block: Block, i: number) => (
+							<li key={i} class="data-row block-row">
+								<div class="hm-row">
+									<input
+										key={`start-${i}-${block.start ?? "empty"}`}
+										type="time"
+										name={`block-${i}-start`}
+										aria-label={t("Start")}
+										defaultValue={timeInputValue(block.start)}
+									/>
+									<span aria-hidden="true">–</span>
+									<input
+										key={`end-${i}-${block.end ?? "empty"}`}
+										type="time"
+										name={`block-${i}-end`}
+										aria-label={t("End")}
+										defaultValue={timeInputValue(block.end)}
+									/>
+								</div>
+							</li>
+						))}
+					</ul>
+					<button type="submit" class="btn btn-primary">
+						{t("Save")}
+					</button>
+				</form>
 				<button
 					type="button"
 					className="toggle-button"

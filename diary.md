@@ -281,3 +281,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 92. Booking tops up short days from depot; drawdown decreases it (req11)
     `(edit time-tracking.ts: defaultBookingSec/bookDay; app.tsx; tests)`
+
+93. Block edits commit via form submit, not per-keystroke change
+    `(add applyBlockEdits; app.tsx: block-form + Save button; tests)`

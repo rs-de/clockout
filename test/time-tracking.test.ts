@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { describe, test } from "node:test"
 
 import {
+	applyBlockEdits,
 	blockDurationSec,
 	bookDay,
 	createTrackingData,
@@ -90,6 +91,69 @@ describe("setBlockField / trailing-block invariant", () => {
 		const blocks = setBlockField(initial, 0, "start", 10 * 60)
 		assert.deepEqual(blocks, [
 			{ start: 10 * 60, end: 1 * H },
+			{ start: null, end: null },
+		])
+	})
+})
+
+describe("applyBlockEdits", () => {
+	test("applies one edit per existing block in order", () => {
+		const initial = [
+			{ start: 0, end: 1 * H },
+			{ start: 2 * H, end: null },
+		]
+		const blocks = applyBlockEdits(initial, [
+			{ start: 0, end: 1 * H },
+			{ start: 2 * H, end: 3 * H },
+		])
+		assert.deepEqual(blocks, [
+			{ start: 0, end: 1 * H },
+			{ start: 2 * H, end: 3 * H },
+			{ start: null, end: null },
+		])
+	})
+
+	test("discards a pair shorter than MIN_SESSION_SEC back to empty (req #10)", () => {
+		const initial = [{ start: null, end: null }]
+		const blocks = applyBlockEdits(initial, [{ start: 0, end: 30 }])
+		assert.deepEqual(blocks, [{ start: null, end: null }])
+	})
+
+	test("discards an end with no start at all", () => {
+		// The end field is never disabled in the UI (app.tsx) — this is the
+		// only guard against a stray end-only block.
+		const initial = [{ start: null, end: null }]
+		const blocks = applyBlockEdits(initial, [{ start: null, end: 1 * H }])
+		assert.deepEqual(blocks, [{ start: null, end: null }])
+	})
+
+	test("collapses an earlier block cleared back to empty, instead of leaving a stray empty row", () => {
+		const initial = [
+			{ start: 0, end: 1 * H },
+			{ start: null, end: null },
+		]
+		// Clearing just the first block's start (its end left stale at 1*H,
+		// same as a form submit with the end field disabled) discards it back
+		// to empty via normalizeBlock — leaving two empty blocks, one from
+		// that discard and one already-trailing, unless collapsed into one.
+		const blocks = applyBlockEdits(initial, [
+			{ start: null, end: 1 * H },
+			{ start: null, end: null },
+		])
+		assert.deepEqual(blocks, [{ start: null, end: null }])
+	})
+
+	test("re-asserts the trailing-empty-block invariant only once at the end", () => {
+		const initial = [
+			{ start: null, end: null },
+			{ start: null, end: null },
+		]
+		const blocks = applyBlockEdits(initial, [
+			{ start: 0, end: 1 * H },
+			{ start: null, end: null },
+		])
+		assert.deepEqual(blocks, [
+			{ start: 0, end: 1 * H },
 			{ start: null, end: null },
 		])
 	})

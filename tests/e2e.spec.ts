@@ -31,19 +31,29 @@ async function setUpTracking(page: Page, password = "correct horse battery") {
 
 /** Fills a block's start/end via its time inputs (not the Start/Stop
  * buttons) — the buttons stamp the real current time, so completing a
- * multi-hour session through them would mean actually waiting hours. */
+ * multi-hour session through them would mean actually waiting hours. The
+ * block-editing form has its own always-visible "Save" submit button,
+ * standard HTML form structure — no focus-tracking or dynamic swapping. */
 async function fillBlock(
 	page: Page,
 	index: number,
 	start: string,
 	end: string,
 ) {
+	const rows = page.locator(".block-list li")
+	const rowsBefore = await rows.count()
 	const startInput = page.locator('input[aria-label="Start"]').nth(index)
 	await startInput.fill(start)
-	await startInput.dispatchEvent("change")
 	const endInput = page.locator('input[aria-label="End"]').nth(index)
 	await endInput.fill(end)
-	await endInput.dispatchEvent("change")
+	await page.getByRole("button", { name: "Save" }).click()
+	// handleBlockFormSubmit's save is fire-and-forget (app.tsx) — wait for
+	// the completed block's trailing empty row to actually appear (proof
+	// data.blocks re-rendered from the saved state, which only happens
+	// after saveTrackingData() resolves) before returning, so a caller
+	// relying on the committed data (worked time, depot, a reload) can't
+	// race ahead of the write reaching IndexedDB.
+	await expect(rows).toHaveCount(rowsBefore + 1)
 }
 
 test("home page loads the setup form", async ({ page }) => {
