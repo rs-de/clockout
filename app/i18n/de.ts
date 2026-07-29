@@ -62,6 +62,8 @@ export const de: Record<string, string> = {
 		"Das Maximum, das an einem Tag gebucht werden kann — die restliche Zeit fließt trotzdem ins Depot.",
 	"This browser doesn't have local data for this link.":
 		"Dieser Browser hat keine lokalen Daten für diesen Link.",
+	"This update couldn't carry over your history — starting fresh from today.":
+		"Dieses Update konnte deinen Verlauf nicht übernehmen — du startest heute neu.",
 	Unlock: "Entsperren",
 	"Used to calculate your quitting time and depot credit.":
 		"Wird verwendet, um deinen Feierabend und die Depot-Gutschrift zu berechnen.",

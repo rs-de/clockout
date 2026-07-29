@@ -296,3 +296,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 97. Detect pre-rewrite (events-shaped) local/synced docs; start fresh
     `(add isCurrentTrackingData; wire app.tsx load + unlock to fresh-start)`
+
+98. Show a one-time banner when a legacy doc got reset to fresh
+    `(edit app.tsx: legacyDataReset + time-banner; de.ts: new string)`

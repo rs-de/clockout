@@ -391,4 +391,9 @@ test("pre-rewrite local data (weekly target + event log, no blocks/bookings) sta
 
 	await page.goto(`/d/${id}`)
 	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
+	await expect(
+		page.getByText(
+			"This update couldn't carry over your history — starting fresh from today.",
+		),
+	).toBeVisible()
 })

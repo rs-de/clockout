@@ -284,6 +284,13 @@ export const App = clientEntry(
 		let sessionKey: TrackingSyncKey | null = null
 		const syncEngine = createSyncEngine(() => handle.update())
 
+		// Set once, for the rest of this session, the moment a pre-rewrite
+		// document (see isCurrentTrackingData) is replaced with a fresh one —
+		// read by the tracking view below so the reset isn't silent. A reload
+		// never re-triggers it: by the time this is set, the replacement is
+		// already the one saved to storage.
+		let legacyDataReset = false
+
 		// Reads the current URL and resolves which view it maps to. Not just a
 		// one-shot mount-time check: a soft (frame) navigation — e.g. clicking
 		// the logo from an /example/:id page back to / — reuses this exact
@@ -309,6 +316,7 @@ export const App = clientEntry(
 			if (data && !isCurrentTrackingData(data)) {
 				data = createTrackingData(undefined, data.id)
 				await saveTrackingData(data)
+				legacyDataReset = true
 			}
 			if (data) {
 				// / is a landing page, not the tracking screen itself — only
@@ -409,6 +417,7 @@ export const App = clientEntry(
 				let data = await decryptTrackingData(doc, syncKey)
 				if (!isCurrentTrackingData(data)) {
 					data = createTrackingData(undefined, data.id)
+					legacyDataReset = true
 				}
 				await saveTrackingData(data)
 				await saveSyncKey(syncKey)
@@ -926,6 +935,15 @@ export const App = clientEntry(
 						}
 						onBookDay={(bookingSec) => void handleBookDay(data, bookingSec)}
 						t={t}
+						banner={
+							legacyDataReset && (
+								<p class="time-banner" role="status">
+									{t(
+										"This update couldn't carry over your history — starting fresh from today.",
+									)}
+								</p>
+							)
+						}
 						footer={
 							syncStatusLabel(syncEngine.getStatus(), t) && (
 								<p class="sync-status" role="status">
