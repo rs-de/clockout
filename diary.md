@@ -290,3 +290,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 95. Correct req #11: only the daily-max overflow banks, not all overtime
     `(edit time-tracking.ts: bookingDelta; requirements.md; tests)`
+
+96. Freeze Feierabend once the minimum's covered and tracking stops
+    `(edit time-tracking.ts: quittingTimeSec anchor; requirements.md; tests)`

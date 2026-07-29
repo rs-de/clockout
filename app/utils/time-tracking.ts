@@ -206,20 +206,46 @@ export function depotSec(data: TrackingData): number {
 	return data.bookings.at(-1)?.depotAfterSec ?? 0
 }
 
+/** The most recently closed block's end, or `null` if nothing's been
+ * closed yet today (skips the always-present trailing empty block). */
+function lastBlockEndSec(blocks: Block[]): number | null {
+	for (let i = blocks.length - 1; i >= 0; i--) {
+		const end = blocks[i]?.end
+		if (end != null) return end
+	}
+	return null
+}
+
 /**
  * Clock time (Unix seconds) at which today's minimum is/was covered
  * (requirement #8): `now + dailyMin − depot − workedTime`. While a block is
  * running, `now` and `workedTime` advance together, so this stays fixed —
- * it only moves if tracking pauses (recedes) or the depot changes. May be
- * in the past, which just means the minimum is already covered.
+ * it only moves if tracking pauses (recedes) or the depot changes.
+ *
+ * Once paused (not running) with the minimum already covered, there's
+ * nothing left to resume toward — that instant is a fixed point in the
+ * past, not a live estimate, so `now` is replaced with the last closed
+ * block's own end instead: otherwise the *displayed* clock time would keep
+ * silently drifting later with every render, in lockstep with `now`, even
+ * though nothing about the data changed. (Paused but still short of the
+ * minimum is different: recedes on purpose, since resuming later really
+ * does push the estimate back — see the "recedes" test below.)
  */
 export function quittingTimeSec(data: TrackingData, nowSec: number): number {
-	return (
-		nowSec +
-		data.settings.dailyMinimum * 60 -
-		depotSec(data) -
-		workedSec(data.blocks, nowSec)
-	)
+	const worked = workedSec(data.blocks, nowSec)
+	const remaining = data.settings.dailyMinimum * 60 - depotSec(data) - worked
+	if (remaining <= 0 && !isRunning(data.blocks)) {
+		const anchor = lastBlockEndSec(data.blocks)
+		if (anchor !== null) {
+			return (
+				anchor +
+				data.settings.dailyMinimum * 60 -
+				depotSec(data) -
+				workedSec(data.blocks, anchor)
+			)
+		}
+	}
+	return nowSec + remaining
 }
 
 /**
@@ -328,7 +354,7 @@ export function summarize(
 		isRunning: isRunning(data.blocks),
 		workedSec: worked,
 		depotSec: depot,
-		quittingTimeSec: nowSec + data.settings.dailyMinimum * 60 - depot - worked,
+		quittingTimeSec: quittingTimeSec(data, nowSec),
 		defaultBookingSec: defaultBookingSec(data, nowSec),
 	}
 }

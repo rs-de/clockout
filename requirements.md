@@ -22,7 +22,11 @@ and how your flextime depot is doing.
    when today's work is done: `now + dailyMin − depot − workedTime`,
    recomputed live (`workedTime` includes a currently running block's
    elapsed-so-far time). Shown as a plain clock time even if it's already
-   in the past (i.e. the minimum is already covered).
+   in the past (i.e. the minimum is already covered). Once paused (not
+   running) with the minimum already covered, that instant is fixed — it
+   no longer moves with `now`, it's anchored to the last closed block's own
+   end instead. Still short of the minimum while paused, it keeps receding
+   with `now` as before, since resuming later really does push it back.
 9. Data should be redundancy-free and compact. The depot total is always
    derived from the latest "Buchung" (booking) event — see #11 — never
    stored-and-patched directly.

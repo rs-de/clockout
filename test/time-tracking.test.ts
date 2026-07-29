@@ -298,6 +298,34 @@ describe("quittingTimeSec", () => {
 		}
 		assert.ok(quittingTimeSec(data, 9 * H) < 9 * H)
 	})
+
+	test("freezes at the closed block's end once the minimum is already covered, instead of drifting with `now`", () => {
+		// 4h worked + 3h already in the depot exactly covers the 7h minimum —
+		// the moment that happened is fixed (the block's own end), so it must
+		// read the same however much later it's checked.
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: 4 * H }],
+			bookings: [{ t: -1, workedSec: 0, bookingSec: 0, depotAfterSec: 3 * H }],
+		}
+		assert.equal(quittingTimeSec(data, 4 * H), 4 * H)
+		assert.equal(quittingTimeSec(data, 4 * H), quittingTimeSec(data, 20 * H))
+	})
+
+	test("freezes at the past instant the minimum was covered, even past that block's own end", () => {
+		// 5h worked (ending at 5h) + 3h depot overshoots the 7h minimum by
+		// 1h — the fixed crossing instant is 1h before the block actually
+		// ended (4h), not a value that keeps trailing behind `now`.
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: 0, end: 5 * H }],
+			bookings: [{ t: -1, workedSec: 0, bookingSec: 0, depotAfterSec: 3 * H }],
+		}
+		assert.equal(quittingTimeSec(data, 5 * H), 4 * H)
+		assert.equal(quittingTimeSec(data, 5 * H), quittingTimeSec(data, 20 * H))
+	})
 })
 
 describe("defaultBookingSec", () => {

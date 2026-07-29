@@ -128,6 +128,24 @@ test("completing a block auto-appends a new one, and Buchen banks the max-overfl
 	)
 })
 
+test("quitting time freezes once the minimum is covered and tracking stops, instead of drifting", async ({
+	page,
+}) => {
+	await setUpTracking(page)
+
+	// Exactly the 7h daily minimum, no depot involved — worked alone covers
+	// it, and the block is then closed (not running).
+	await fillBlock(page, 0, "09:00", "16:00")
+
+	const stat = page.locator(".time-stat--primary")
+	const textAfterSave = await stat.textContent()
+	// The 1s live-tick interval (app.tsx) re-renders this every second;
+	// confirm the text stays exactly the same instead of drifting with real
+	// time now that tracking has stopped.
+	await page.waitForTimeout(3000)
+	await expect(stat).toHaveText(textAfterSave ?? "")
+})
+
 test("booking time can't exceed the daily max; native validation blocks submit", async ({
 	page,
 }) => {
