@@ -102,23 +102,25 @@ test("a session shorter than a minute is discarded instead of closing the block"
 	)
 })
 
-test("completing a block auto-appends a new one, and Buchen banks overtime to the depot", async ({
+test("completing a block auto-appends a new one, and Buchen banks the max-overflow to the depot", async ({
 	page,
 }) => {
 	await setUpTracking(page)
 
-	await fillBlock(page, 0, "09:00", "17:00")
+	await fillBlock(page, 0, "07:00", "18:00")
 
 	await expect(page.locator(".block-list li")).toHaveCount(2)
 	await expect(page.getByText("Depot: 0h 00m")).toBeVisible()
 
-	// The booking field defaults to the day's worked time (8h), capped at
-	// the daily max — submitting it banks the 1h over the 7h minimum.
-	await expect(page.locator('input[name="bookingHours"]')).toHaveValue("8")
-	await expect(page.getByText("Depot after booking: 1h 00m")).toBeVisible()
+	// 11h worked, but the booking field caps at the 9h55m daily max —
+	// submitting it banks exactly the unbookable 1h05m overflow (time
+	// between the 7h minimum and the max is booked as-is, not banked).
+	await expect(page.locator('input[name="bookingHours"]')).toHaveValue("9")
+	await expect(page.locator('input[name="bookingMinutes"]')).toHaveValue("55")
+	await expect(page.getByText("Depot after booking: 1h 05m")).toBeVisible()
 	await page.getByRole("button", { name: "Book" }).click()
 
-	await expect(page.getByText("Depot: 1h 00m")).toBeVisible()
+	await expect(page.getByText("Depot: 1h 05m")).toBeVisible()
 	// Booking resets the day: back to a single empty block.
 	await expect(page.locator(".block-list li")).toHaveCount(1)
 	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue(
@@ -162,10 +164,10 @@ test("a short day's booking time is topped up from the depot, capped at what's a
 }) => {
 	await setUpTracking(page)
 
-	// Bank 1h of depot: an 8h day is 1h over the 7h minimum.
-	await fillBlock(page, 0, "09:00", "17:00")
+	// Bank 1h05m of depot: 11h worked, only 9h55m of it fits the daily max.
+	await fillBlock(page, 0, "07:00", "18:00")
 	await page.getByRole("button", { name: "Book" }).click()
-	await expect(page.getByText("Depot: 1h 00m")).toBeVisible()
+	await expect(page.getByText("Depot: 1h 05m")).toBeVisible()
 
 	// A short 2h day next — reload so the booking field's default (only set
 	// via defaultValue at mount) actually reflects the fresh state, the same
@@ -175,22 +177,22 @@ test("a short day's booking time is topped up from the depot, capped at what's a
 
 	const bookingHours = page.locator('input[name="bookingHours"]')
 	const bookingMinutes = page.locator('input[name="bookingMinutes"]')
-	// Topped up to 2h worked + the 1h banked depot = 3h, not just the 2h
-	// actually worked.
+	// Topped up to 2h worked + the 1h05m banked depot = 3h05m, not just the
+	// 2h actually worked.
 	await expect(bookingHours).toHaveValue("3")
-	await expect(bookingMinutes).toHaveValue("0")
+	await expect(bookingMinutes).toHaveValue("5")
 
 	// Can't stretch further than what the depot actually covers.
 	await bookingHours.fill("4")
 	await expect(bookingHours).toHaveJSProperty(
 		"validationMessage",
-		"Booking time can't exceed 3h 00m.",
+		"Booking time can't exceed 3h 05m.",
 	)
 
-	// Booking the topped-up 3h draws the depot back down to 0 — none of the
-	// borrowed hour was actually worked past the minimum, so nothing offsets it.
+	// Booking the topped-up 3h05m draws the depot back down to 0 — none of
+	// the borrowed time was actually worked, so nothing offsets it.
 	await bookingHours.fill("3")
-	await bookingMinutes.fill("0")
+	await bookingMinutes.fill("5")
 	await expect(page.getByText("Depot after booking: 0h 00m")).toBeVisible()
 	await page.getByRole("button", { name: "Book" }).click()
 	await expect(page.getByText("Depot: 0h 00m")).toBeVisible()

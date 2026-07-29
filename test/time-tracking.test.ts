@@ -358,7 +358,7 @@ describe("bookDay", () => {
 		assert.equal(depotSec(booked), 0)
 	})
 
-	test("a day over the minimum (but under the max) banks the surplus", () => {
+	test("a day over the minimum but under the max banks nothing — booked in full", () => {
 		const worked = 8.5 * H
 		const data: TrackingData = {
 			id: "test",
@@ -367,10 +367,10 @@ describe("bookDay", () => {
 			bookings: [],
 		}
 		const booked = bookDay(data, defaultBookingSec(data, worked), worked)
-		assert.equal(depotSec(booked), 1.5 * H)
+		assert.equal(depotSec(booked), 0)
 	})
 
-	test("a day over the max banks worked-minus-minimum, split across both terms", () => {
+	test("a day over the max banks exactly the unbookable overflow", () => {
 		const worked = 11 * H
 		const data: TrackingData = {
 			id: "test",
@@ -379,10 +379,10 @@ describe("bookDay", () => {
 			bookings: [],
 		}
 		const booked = bookDay(data, defaultBookingSec(data, worked), worked)
-		assert.equal(depotSec(booked), worked - 7 * H)
+		assert.equal(depotSec(booked), worked - (9 * 60 + 55) * 60)
 	})
 
-	test("banks the same total regardless of the exact bookingSec, as long as it's >= dailyMin", () => {
+	test("the banked total depends on the exact bookingSec — less booked banks more", () => {
 		const worked = 8 * H
 		const data: TrackingData = {
 			id: "test",
@@ -390,13 +390,13 @@ describe("bookDay", () => {
 			blocks: [{ start: 0, end: worked }],
 			bookings: [],
 		}
-		const bookedDefault = bookDay(data, worked, worked)
+		const bookedFull = bookDay(data, worked, worked)
 		const bookedLower = bookDay(data, 7.5 * H, worked)
-		assert.equal(depotSec(bookedDefault), 1 * H)
-		assert.equal(depotSec(bookedLower), 1 * H)
+		assert.equal(depotSec(bookedFull), 0)
+		assert.equal(depotSec(bookedLower), 0.5 * H)
 	})
 
-	test("booking below the minimum still banks the un-booked remainder in full", () => {
+	test("booking below what was worked banks the un-booked remainder in full", () => {
 		const worked = 8 * H
 		const data: TrackingData = {
 			id: "test",
@@ -404,8 +404,8 @@ describe("bookDay", () => {
 			blocks: [{ start: 0, end: worked }],
 			bookings: [],
 		}
-		// Booked only 6h (below the 7h minimum) out of 8h worked: the credit
-		// term is floored at 0, but the un-booked 2h is still banked in full.
+		// Booked only 6h out of 8h worked: the un-booked 2h still banks in
+		// full, regardless of where the 7h minimum falls.
 		const booked = bookDay(data, 6 * H, worked)
 		assert.equal(depotSec(booked), 2 * H)
 	})
@@ -439,7 +439,7 @@ describe("bookDay", () => {
 		assert.equal(depotSec(booked), 0)
 	})
 
-	test("a top-up past the minimum nets earned overtime against the depot draw", () => {
+	test("a top-up beyond worked time draws the depot down by the full gap", () => {
 		const worked = 8 * H
 		const data: TrackingData = {
 			id: "test",
@@ -449,12 +449,12 @@ describe("bookDay", () => {
 				{ t: -1, workedSec: 8 * H, bookingSec: 8 * H, depotAfterSec: 2 * H },
 			],
 		}
-		// Booking the full daily max (9h55m) draws 1h55m from the depot to
-		// cover the gap above the 8h worked, but the 1h actually worked past
-		// the 7h minimum still earns credit — net -55m, not the full -1h55m.
+		// Booking the full daily max (9h55m) draws the entire 1h55m gap above
+		// the 8h worked from the depot — the 8h itself, being under the max,
+		// earns no offsetting credit anymore.
 		const booked = bookDay(data, defaultBookingSec(data, worked), worked)
 		assert.equal(booked.bookings.at(-1)?.bookingSec, (9 * 60 + 55) * 60)
-		assert.equal(depotSec(booked), 2 * H - 55 * 60)
+		assert.equal(depotSec(booked), 2 * H - (1 * H + 55 * 60))
 	})
 
 	test("still clamps a bookingSec beyond worked time plus available depot", () => {
@@ -513,7 +513,9 @@ describe("bookDay", () => {
 		assert.deepEqual(booked.blocks, [{ start: null, end: null }])
 		assert.equal(booked.bookings.length, 2)
 		assert.equal(booked.bookings[0]?.depotAfterSec, 5 * 60)
-		assert.equal(depotSec(booked), 5 * 60 + (worked - 7 * H))
+		// Booked exactly what was worked (under the max) — banks nothing on
+		// top, so the depot is unchanged from before this booking.
+		assert.equal(depotSec(booked), 5 * 60)
 	})
 })
 

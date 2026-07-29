@@ -35,15 +35,13 @@ and how your flextime depot is doing.
     Pressing Enter while focused in the field also submits it. Submitting:
     - lets `bookingTime` exceed `workedTime` by at most the current depot,
       never inventing time from nowhere and never exceeding the daily max.
-    - with `overlap = min(bookingTime, workedTime)`, adds
-      `max(0, overlap - dailyMin) + (workedTime - overlap) -
-      max(0, bookingTime - overlap)` to the depot: real worked time above
-      the minimum still banks, worked time left unbooked (e.g. because
-      it's over the max) still banks too, and any booked time beyond what
-      was actually worked draws the depot down by exactly that much
-      instead — a day worked at or above the minimum and booked at or
-      under what was worked still only ever grows the depot, same as
-      before; a short day topped up from the depot draws it down instead.
+    - adds `workedTime - bookingTime` to the depot: worked time left
+      unbooked because it's over the daily max still banks, in full; time
+      worked between the daily minimum and the daily max is simply booked
+      as-is and does not additionally bank (the minimum only shapes the
+      quitting-time estimate, not what's banked); booking beyond what was
+      worked (a short day topped up from the depot) draws it down by
+      exactly that gap instead.
     - appends a "Buchung" event recording the new depot total (and the
       booking time), keeping a ledger of past bookings — how much (if
       any) depot a booking drew down is only ever derivable from that

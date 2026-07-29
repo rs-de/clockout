@@ -245,19 +245,14 @@ export function defaultBookingSec(data: TrackingData, nowSec: number): number {
  * implies more was booked than was actually worked plus what the depot
  * could cover, or more than the configured max.
  *
- * Booking beyond `workedSec` tops the day up from the depot instead of
- * inventing time — the gap (`clampedBookingSec - overlapWithWorked`) draws
- * the depot down by exactly that much. On the actually-worked side,
- * nothing changes from before: `max(0, overlapWithWorked - dailyMin) +
- * (workedSec - overlapWithWorked)` still banks ordinary overtime on the
- * worked portion that got booked, plus whatever worked time is left
- * unbooked (e.g. because it's over the max) — together always
- * `workedSec - dailyMin` whenever `bookingSec` is left at its (worked-time)
- * default. The clamp above ensures the drawdown can never exceed the
- * depot actually available, so it can never go negative — it just no
- * longer *only* grows the way it did before this booking could dip into
- * it (a day worked at or above the minimum, booked at or under what was
- * worked, still only ever grows it, same as before).
+ * `depotDelta` is simply `worked - clampedBookingSec`: worked time left
+ * unbooked because it's over the daily max still banks, in full — but time
+ * worked between the daily minimum and the daily max is booked as-is and
+ * doesn't additionally bank (dailyMin has no part in this — it only shapes
+ * the quitting-time estimate). Booking beyond `workedSec` tops the day up
+ * from the depot instead of inventing time, drawing it down by exactly the
+ * gap; the clamp above ensures that drawdown can never exceed what's
+ * actually available.
  */
 function bookingDelta(
 	data: TrackingData,
@@ -265,19 +260,13 @@ function bookingDelta(
 	nowSec: number,
 ): { worked: number; clampedBookingSec: number; depotDelta: number } {
 	const worked = workedSec(data.blocks, nowSec)
-	const dailyMinSec = data.settings.dailyMinimum * 60
 	const dailyMaxSec = data.settings.dailyMax * 60
 	const depotAvailable = Math.max(0, depotSec(data))
 	const clampedBookingSec = Math.min(
 		Math.max(0, bookingSec),
 		Math.min(worked + depotAvailable, dailyMaxSec),
 	)
-	const overlapWithWorked = Math.min(clampedBookingSec, worked)
-	const drawnFromDepot = Math.max(0, clampedBookingSec - worked)
-	const depotDelta =
-		Math.max(0, overlapWithWorked - dailyMinSec) +
-		(worked - overlapWithWorked) -
-		drawnFromDepot
+	const depotDelta = worked - clampedBookingSec
 	return { worked, clampedBookingSec, depotDelta }
 }
 

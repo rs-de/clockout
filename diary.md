@@ -287,3 +287,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 94. Live-preview the depot balance a booking would produce
     `(edit time-tracking.ts: previewDepotAfterBooking; app.tsx/de.ts/tests)`
+
+95. Correct req #11: only the daily-max overflow banks, not all overtime
+    `(edit time-tracking.ts: bookingDelta; requirements.md; tests)`
