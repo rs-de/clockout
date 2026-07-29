@@ -10,6 +10,7 @@
 	--color-start-hover: #156c2e;
 	--color-stop: #cf222e;
 	--color-stop-hover: #a91e28;
+	--color-warn: #9a6700;
 	/* No Open Props step lands on 12px (scale jumps 8px -> 16px) — kept as a
 	   literal rather than forcing a nearby token onto a value it doesn't match. */
 	--space-3: 12px;
@@ -49,6 +50,7 @@
 	:root {
 		--color-bg: #0d1117;
 		--color-text: #e6edf3;
+		--color-warn: #e3b341;
 
 		--primary-1: 212 35% 9.2%;
 		--primary-2: 216 50% 11.8%;
@@ -556,6 +558,10 @@ select:disabled {
 	font-size: 1.5rem;
 	font-weight: var(--font-weight-7);
 	color: hsl(var(--primary-11));
+}
+
+.time-stat--primary[data-past="true"] {
+	color: var(--color-warn);
 }
 
 .time-stat--secondary {

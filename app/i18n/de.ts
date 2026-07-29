@@ -40,6 +40,7 @@ export const de: Record<string, string> = {
 	Password: "Passwort",
 	"Passwords don't match": "Passwörter stimmen nicht überein",
 	Privacy: "Datenschutz",
+	"Quitting time was: {time}": "Feierabend war um {time}",
 	"Quitting time: {time}": "Feierabend ist um {time}",
 	Refresh: "Aktualisieren",
 	"Repeat password": "Passwort wiederholen",

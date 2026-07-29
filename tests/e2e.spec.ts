@@ -226,6 +226,20 @@ test("an example shows its scenario's quitting time and depot, and never syncs",
 	await expect(page.getByRole("status", { name: /Sync|Synced/ })).toHaveCount(0)
 })
 
+test("a past quitting time switches to past tense and a warning color", async ({
+	page,
+}) => {
+	await page.goto("/example/depot-credit")
+	const stat = page.locator(".time-stat--primary")
+	await expect(stat).toHaveAttribute("data-past", "false")
+	await expect(stat).toHaveCSS("color", "rgb(11, 104, 203)")
+
+	await page.goto("/example/past-quitting-time")
+	await expect(stat).toHaveText(/Quitting time was: \d{2}:\d{2}/)
+	await expect(stat).toHaveAttribute("data-past", "true")
+	await expect(stat).toHaveCSS("color", "rgb(154, 103, 0)")
+})
+
 test("home shows a link to the existing doc, not the tracking screen directly", async ({
 	page,
 }) => {

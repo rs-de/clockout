@@ -1006,17 +1006,23 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 			summary.workedSec + Math.max(0, summary.depotSec),
 		)
 
+		const isPastQuittingTime = summary.quittingTimeSec <= nowSec
+		const quittingTime = formatClockTime(
+			new Date(summary.quittingTimeSec * 1000),
+			dateFormat,
+		)
+
 		return (
 			<div class="time-page">
 				{banner}
 				<div class="time-stats">
-					<p class="time-stat time-stat--primary">
-						{t("Quitting time: {time}", {
-							time: formatClockTime(
-								new Date(summary.quittingTimeSec * 1000),
-								dateFormat,
-							),
-						})}
+					<p
+						class="time-stat time-stat--primary"
+						data-past={isPastQuittingTime}
+					>
+						{isPastQuittingTime
+							? t("Quitting time was: {time}", { time: quittingTime })
+							: t("Quitting time: {time}", { time: quittingTime })}
 					</p>
 					<p class="time-stat time-stat--secondary">
 						{t("Depot: {duration}", {
