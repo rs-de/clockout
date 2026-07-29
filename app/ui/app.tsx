@@ -28,6 +28,7 @@ import {
 	createTrackingData,
 	type DateFormat,
 	formatDuration,
+	isCurrentTrackingData,
 	previewDepotAfterBooking,
 	startBlock,
 	stopBlock,
@@ -303,8 +304,12 @@ export const App = clientEntry(
 				return
 			}
 
-			const data = await loadTrackingData()
+			let data = await loadTrackingData()
 			if (signal.aborted) return
+			if (data && !isCurrentTrackingData(data)) {
+				data = createTrackingData(undefined, data.id)
+				await saveTrackingData(data)
+			}
 			if (data) {
 				// / is a landing page, not the tracking screen itself — only
 				// /d/:id (the bookmarkable URL setup already redirects to) shows
@@ -401,7 +406,10 @@ export const App = clientEntry(
 			const doc = deserializeEncryptedDocument(serialized)
 			try {
 				const syncKey = await deriveTrackingKey(unlockPassword, doc.salt)
-				const data = await decryptTrackingData(doc, syncKey)
+				let data = await decryptTrackingData(doc, syncKey)
+				if (!isCurrentTrackingData(data)) {
+					data = createTrackingData(undefined, data.id)
+				}
 				await saveTrackingData(data)
 				await saveSyncKey(syncKey)
 			} catch {

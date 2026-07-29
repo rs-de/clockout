@@ -347,3 +347,48 @@ test("clearing local storage requires re-entering the password to unlock", async
 		page.getByRole("button", { name: /^(Start|Stop)$/ }),
 	).toBeVisible()
 })
+
+test("pre-rewrite local data (weekly target + event log, no blocks/bookings) starts fresh instead of crashing", async ({
+	page,
+}) => {
+	const id = "legacy-doc"
+
+	// A real v0.2.5 client's IndexedDB record — before the day/block/depot
+	// rewrite, `tracking-data` held `{ settings: { weeklyTargetMin }, events }`
+	// with no `blocks`/`bookings` at all.
+	await page.goto("/")
+	await page.evaluate(
+		(docId) =>
+			new Promise<void>((resolve, reject) => {
+				const request = indexedDB.open("clockout", 2)
+				request.onupgradeneeded = () => {
+					const db = request.result
+					if (!db.objectStoreNames.contains("tracking-data")) {
+						db.createObjectStore("tracking-data")
+					}
+					if (!db.objectStoreNames.contains("sync-key")) {
+						db.createObjectStore("sync-key")
+					}
+				}
+				request.onsuccess = () => {
+					const db = request.result
+					const tx = db.transaction("tracking-data", "readwrite")
+					tx.objectStore("tracking-data").put(
+						{
+							id: docId,
+							settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+							events: [{ t: 1700000000, type: "start" }],
+						},
+						"current",
+					)
+					tx.oncomplete = () => resolve()
+					tx.onerror = () => reject(tx.error)
+				}
+				request.onerror = () => reject(request.error)
+			}),
+		id,
+	)
+
+	await page.goto(`/d/${id}`)
+	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
+})

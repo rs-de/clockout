@@ -11,6 +11,7 @@ import {
 	defaultBookingSec,
 	depotSec,
 	formatDuration,
+	isCurrentTrackingData,
 	isRunning,
 	MIN_SESSION_SEC,
 	previewDepotAfterBooking,
@@ -57,6 +58,31 @@ describe("createTrackingData", () => {
 		assert.equal(a.settings.dailyMax, DEFAULT_DAILY_MAX)
 		assert.deepEqual(a.blocks, [{ start: null, end: null }])
 		assert.deepEqual(a.bookings, [])
+	})
+})
+
+describe("isCurrentTrackingData", () => {
+	test("true for a document built by createTrackingData", () => {
+		assert.equal(isCurrentTrackingData(createTrackingData()), true)
+	})
+
+	// The shape actually persisted by v0.2.5 (weekly target + flat event log,
+	// no blocks/bookings) — see diary #97.
+	test("false for a pre-rewrite weekly/event-log document", () => {
+		const legacy = {
+			id: "abc",
+			settings: { weeklyTargetMin: 35 * 60, dailyMax: 9 * 60 + 55 },
+			events: [{ t: 0, type: "start" }],
+		} as unknown as TrackingData
+		assert.equal(isCurrentTrackingData(legacy), false)
+	})
+
+	test("false when only one of blocks/bookings is present", () => {
+		const partial = {
+			...createTrackingData(),
+			bookings: undefined,
+		} as unknown as TrackingData
+		assert.equal(isCurrentTrackingData(partial), false)
 	})
 })
 

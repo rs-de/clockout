@@ -78,6 +78,15 @@ export function createTrackingData(
 	return { id, settings, blocks: [{ start: null, end: null }], bookings: [] }
 }
 
+/**
+ * A pre-rewrite document (weekly target + flat event log) has `events` and
+ * neither of these arrays — and no faithful translation from a flat event
+ * log into depot bookings exists, so it can't be upgraded in place.
+ */
+export function isCurrentTrackingData(data: TrackingData): boolean {
+	return Array.isArray(data.blocks) && Array.isArray(data.bookings)
+}
+
 /** Below this, a start/stop pair is discarded as an accidental tap (requirement #10). */
 export const MIN_SESSION_SEC = 60
 

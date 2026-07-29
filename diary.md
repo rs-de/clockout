@@ -293,3 +293,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 96. Freeze Feierabend once the minimum's covered and tracking stops
     `(edit time-tracking.ts: quittingTimeSec anchor; requirements.md; tests)`
+
+97. Detect pre-rewrite (events-shaped) local/synced docs; start fresh
+    `(add isCurrentTrackingData; wire app.tsx load + unlock to fresh-start)`
