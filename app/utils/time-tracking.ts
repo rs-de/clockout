@@ -343,12 +343,29 @@ export function previewDepotAfterBooking(
 	return depotSec(data) + bookingDelta(data, bookingSec, nowSec).depotDelta
 }
 
+/** Same local calendar date — used to tell "booked earlier today" apart from
+ * "booked" on some previous day, since a bare Unix-second comparison can't. */
+function isSameLocalDay(aSec: number, bSec: number): boolean {
+	const a = new Date(aSec * 1000)
+	const b = new Date(bSec * 1000)
+	return (
+		a.getFullYear() === b.getFullYear() &&
+		a.getMonth() === b.getMonth() &&
+		a.getDate() === b.getDate()
+	)
+}
+
 export type TrackingSummary = {
 	isRunning: boolean
 	workedSec: number
 	depotSec: number
 	quittingTimeSec: number
 	defaultBookingSec: number
+	/** True once today's booking is done and nothing's been worked since —
+	 * `bookDay` resets `blocks` to empty, which otherwise reads exactly like
+	 * "haven't started yet", pushing a fresh same-day quitting-time estimate
+	 * that (booked late) can land in the middle of the night. */
+	isDoneForToday: boolean
 }
 
 export function summarize(
@@ -358,6 +375,7 @@ export function summarize(
 	const nowSec = Math.floor(now.getTime() / 1000)
 	const worked = workedSec(data.blocks, nowSec)
 	const depot = depotSec(data)
+	const lastBooking = data.bookings.at(-1)
 
 	return {
 		isRunning: isRunning(data.blocks),
@@ -365,6 +383,11 @@ export function summarize(
 		depotSec: depot,
 		quittingTimeSec: quittingTimeSec(data, nowSec),
 		defaultBookingSec: defaultBookingSec(data, nowSec),
+		isDoneForToday:
+			worked === 0 &&
+			!isRunning(data.blocks) &&
+			lastBooking !== undefined &&
+			isSameLocalDay(lastBooking.t, nowSec),
 	}
 }
 

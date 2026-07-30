@@ -643,4 +643,50 @@ describe("summarize", () => {
 		// Topped up with the 30m depot on top of the 2h worked.
 		assert.equal(summary.defaultBookingSec, 2 * H + 30 * 60)
 	})
+
+	test("isDoneForToday stays true for the rest of the day a late booking happens, then clears the next day", () => {
+		const bookedAt = new Date(2024, 0, 15, 23, 50)
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: null, end: null }],
+			bookings: [
+				{
+					t: Math.floor(bookedAt.getTime() / 1000),
+					workedSec: 7 * H,
+					bookingSec: 7 * H,
+					depotAfterSec: 0,
+				},
+			],
+		}
+
+		const stillTonight = new Date(2024, 0, 15, 23, 55)
+		assert.equal(summarize(data, stillTonight).isDoneForToday, true)
+
+		const nextMorning = new Date(2024, 0, 16, 0, 5)
+		assert.equal(summarize(data, nextMorning).isDoneForToday, false)
+	})
+
+	test("isDoneForToday clears once work resumes after booking", () => {
+		const bookedAt = new Date(2024, 0, 15, 18, 0)
+		const resumedAt = Math.floor(bookedAt.getTime() / 1000) + 60
+		const data: TrackingData = {
+			id: "test",
+			settings: settings(),
+			blocks: [{ start: resumedAt, end: null }],
+			bookings: [
+				{
+					t: Math.floor(bookedAt.getTime() / 1000),
+					workedSec: 7 * H,
+					bookingSec: 7 * H,
+					depotAfterSec: 0,
+				},
+			],
+		}
+
+		assert.equal(
+			summarize(data, new Date(2024, 0, 15, 19, 0)).isDoneForToday,
+			false,
+		)
+	})
 })

@@ -1044,11 +1044,14 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 				<div class="time-stats">
 					<p
 						class="time-stat time-stat--primary"
-						data-past={isPastQuittingTime}
+						data-past={!summary.isDoneForToday && isPastQuittingTime}
+						data-done={summary.isDoneForToday}
 					>
-						{isPastQuittingTime
-							? t("Quitting time was: {time}", { time: quittingTime })
-							: t("Quitting time: {time}", { time: quittingTime })}
+						{summary.isDoneForToday
+							? t("Done for today — see you tomorrow!")
+							: isPastQuittingTime
+								? t("Quitting time was: {time}", { time: quittingTime })
+								: t("Quitting time: {time}", { time: quittingTime })}
 					</p>
 					<p class="time-stat time-stat--secondary">
 						{t("Depot: {duration}", {

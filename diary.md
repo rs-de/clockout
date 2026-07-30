@@ -305,3 +305,6 @@ Pre-diary (retroactive): register scaffolded Remix skill for Claude Code
 
 100. Link the footer's version number to CHANGELOG.md on GitHub
      `(edit footer.tsx: v{pkg.version} as <a> to blob/main/CHANGELOG.md)`
+
+101. Show a "done for today" headline instead of a bogus late-night quitting time after Book
+     `(edit time-tracking.ts/app.tsx/examples.ts: add isDoneForToday; tests)`

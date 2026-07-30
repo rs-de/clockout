@@ -126,6 +126,11 @@ test("completing a block auto-appends a new one, and Buchen banks the max-overfl
 	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue(
 		"",
 	)
+	// The reset-to-empty blocks must not read as "haven't started yet" and
+	// project a fresh same-day quitting time — the day's already booked.
+	const stat = page.locator(".time-stat--primary")
+	await expect(stat).toHaveText("Done for today — see you tomorrow!")
+	await expect(stat).toHaveAttribute("data-done", "true")
 })
 
 test("quitting time freezes once the minimum is covered and tracking stops, instead of drifting", async ({

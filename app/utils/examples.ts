@@ -114,10 +114,16 @@ export function buildExampleData(
 	const last = blocks.at(-1)
 	if (!last || last.end !== null) blocks.push({ start: null, end: null })
 
+	// Stamped the instant before pretendNow's calendar day starts — not just
+	// "pretendNow minus a second" — so it reads as yesterday's booking, not
+	// today's (which `summarize`'s isDoneForToday would otherwise mistake for
+	// "already booked out today" and show the wrong headline).
+	const pretendDayStart = new Date(pretendNow)
+	pretendDayStart.setHours(0, 0, 0, 0)
 	const bookings: Booking[] = example.depotSec
 		? [
 				{
-					t: Math.floor(pretendNow.getTime() / 1000) - 1,
+					t: Math.floor(pretendDayStart.getTime() / 1000) - 1,
 					workedSec: 0,
 					bookingSec: 0,
 					depotAfterSec: example.depotSec,

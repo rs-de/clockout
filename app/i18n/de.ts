@@ -21,6 +21,7 @@ export const de: Record<string, string> = {
 		'Demo: Simulation von "{name}" — {dateTime}. Hier wird nichts gespeichert.',
 	"Depot after booking: {duration}": "Depot nach Buchung: {duration}",
 	"Depot: {duration}": "Depot: {duration}",
+	"Done for today — see you tomorrow!": "Feierabend! Bis morgen.",
 	End: "Ende",
 	Examples: "Beispiele",
 	"German (17.07.2026, 24h)": "Deutsch (17.07.2026, 24h)",
