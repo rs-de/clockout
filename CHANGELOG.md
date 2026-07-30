@@ -4,7 +4,27 @@ All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [0.4.0] - 2026-07-30
+
+### Added
+
+- Greeting landing screen shown instead of the tracking view whenever
+  there's nothing to actually show yet: "Good morning" / "Welcome back"
+  with a "Start work" button before anything's tracked, or the existing
+  "Done for today" headline with a "Back" button once the day is booked
+  out.
+- A "booked out for the day" example scenario, alongside a
+  `next-morning` example demonstrating the new greeting screen.
+
+### Fixed
+
+- Booking late at night no longer projects a bogus middle-of-the-night
+  quitting time; a "Done for today — see you tomorrow!" headline shows
+  instead.
+- "Start work" on the greeting landing now actually starts the block,
+  instead of only dismissing the landing screen.
+
+## [0.3.0] - 2026-07-29
 
 ### Changed
 
@@ -30,4 +50,5 @@ follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   model) no longer crashes the app on load — it starts fresh under the
   same id/password, with a one-time notice explaining the reset.
 
-[Unreleased]: https://github.com/rs-de/clockout/compare/v0.2.5...HEAD
+[0.4.0]: https://github.com/rs-de/clockout/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/rs-de/clockout/compare/v0.2.5...v0.3.0
