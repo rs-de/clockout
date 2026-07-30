@@ -26,9 +26,13 @@ async function setUpTracking(page: Page, password = "correct horse battery") {
 	await page.getByLabel("Repeat password").fill(password)
 	await page.getByRole("button", { name: "Save and start tracking" }).click()
 	await expect(page).toHaveURL(/\/d\//)
-	// A fresh day lands on the greeting landing screen first — dismiss it to
-	// reach the normal tracking view every other test/helper expects.
+	// A fresh day lands on the greeting landing screen first. "Start work"
+	// both dismisses it and stamps the first block's start — immediately
+	// stop again so this helper lands on the same "nothing started yet"
+	// tracking view every other test expects (the sub-minute block gets
+	// discarded, requirement #10 — same mechanics as the discard test below).
 	await page.getByRole("button", { name: "Start work" }).click()
+	await page.getByRole("button", { name: "Stop" }).click()
 	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
 }
 
@@ -82,18 +86,17 @@ test("a fresh day shows a greeting landing screen instead of jumping straight to
 
 	await expect(page.getByText(/^(Good morning|Welcome back)$/)).toBeVisible()
 	await expect(page.getByRole("button", { name: "Start work" })).toBeVisible()
-	// Purely a dismiss — landing here doesn't itself start a block.
 	await expect(
 		page.getByRole("button", { name: "Start", exact: true }),
 	).toHaveCount(0)
 
+	// "Start work" both dismisses the landing and stamps the first block's
+	// start — one click straight into a running day, not an extra step.
 	await page.getByRole("button", { name: "Start work" }).click()
+	await expect(page.getByRole("button", { name: "Stop" })).toBeVisible()
 	await expect(
-		page.getByRole("button", { name: "Start", exact: true }),
-	).toBeVisible()
-	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue(
-		"",
-	)
+		page.locator('input[aria-label="Start"]').first(),
+	).not.toHaveValue("")
 })
 
 test("setup creates tracking data; Start persists a block across reload", async ({
@@ -463,5 +466,5 @@ test("pre-rewrite local data (weekly target + event log, no blocks/bookings) sta
 		),
 	).toBeVisible()
 	await page.getByRole("button", { name: "Start work" }).click()
-	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
+	await expect(page.getByRole("button", { name: "Stop" })).toBeVisible()
 })

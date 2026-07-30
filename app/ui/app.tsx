@@ -1156,6 +1156,7 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 								: "toggle-button time-landing__action"
 						}
 						mix={on("click", () => {
+							if (!summary.isDoneForToday) onStart()
 							dismissed = true
 							handle.update()
 						})}
