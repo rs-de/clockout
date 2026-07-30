@@ -265,6 +265,15 @@ test("a past quitting time switches to past tense and a warning color", async ({
 	await expect(stat).toHaveCSS("color", "rgb(154, 103, 0)")
 })
 
+test("an example can show the day already booked out, instead of a fresh quitting time", async ({
+	page,
+}) => {
+	await page.goto("/example/done-for-today")
+	const stat = page.locator(".time-stat--primary")
+	await expect(stat).toHaveText("Done for today — see you tomorrow!")
+	await expect(stat).toHaveAttribute("data-done", "true")
+})
+
 test("home shows a link to the existing doc, not the tracking screen directly", async ({
 	page,
 }) => {

@@ -7,6 +7,7 @@ export const de: Record<string, string> = {
 	"Already past quitting time": "Feierabend schon vorbei",
 	"Back to examples": "Zurück zu den Beispielen",
 	Book: "Buchen",
+	"Booked out for the day": "Feierabend gebucht",
 	"Booking time": "Buchungszeit",
 	"Booking time can't exceed {max}.":
 		"Buchungszeit darf {max} nicht überschreiten.",

@@ -28,6 +28,10 @@ export type Example = {
 	/** Depot balance already banked before this example opens, e.g. to show
 	 * off requirement #8's quitting-time credit. */
 	depotSec?: number
+	/** Simulates already having booked out for the day, via a booking dated
+	 * `pretendNow` itself (see `buildExampleData`) — shows off the
+	 * "done for today" headline instead of a fresh quitting-time estimate. */
+	bookedToday?: boolean
 }
 
 // Ordered from the most ordinary case to the most edge-case-y, since this
@@ -59,6 +63,15 @@ export const EXAMPLES: Example[] = [
 			"A long open session — quitting time is shown as a real clock time even once it's in the past.",
 		pretendTime: "18:00",
 		blocks: [{ start: "08:00" }],
+	},
+	{
+		id: "done-for-today",
+		title: "Booked out for the day",
+		description:
+			"Already booked out late in the evening — the headline shows the day is done, not a fresh middle-of-the-night quitting time.",
+		pretendTime: "23:50",
+		blocks: [],
+		bookedToday: true,
 	},
 ]
 
@@ -130,6 +143,18 @@ export function buildExampleData(
 				},
 			]
 		: []
+
+	// The opposite of the depotSec booking above: dated `pretendNow` itself,
+	// so it *does* read as "booked out today" and drives isDoneForToday.
+	if (example.bookedToday) {
+		const workedSec = DEFAULT_DAILY_MINIMUM * 60
+		bookings.push({
+			t: Math.floor(pretendNow.getTime() / 1000),
+			workedSec,
+			bookingSec: workedSec,
+			depotAfterSec: bookings.at(-1)?.depotAfterSec ?? 0,
+		})
+	}
 
 	return {
 		id: `example-${example.id}`,

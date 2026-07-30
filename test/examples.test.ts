@@ -163,4 +163,18 @@ describe("EXAMPLES", () => {
 		assert.equal(summary.isRunning, true)
 		assert.ok(summary.quittingTimeSec < Math.floor(pretendNow.getTime() / 1000))
 	})
+
+	test("done-for-today: booked out late, isDoneForToday instead of a fresh quitting time", () => {
+		const example = findExample("done-for-today")
+		if (!example)
+			throw new Error("expected the done-for-today example to exist")
+
+		const realNow = new Date(2026, 6, 15, 10, 0)
+		const data = buildExampleData(example, realNow)
+		const pretendNow = resolvePretendNow(example, realNow)
+		const summary = summarize(data, pretendNow)
+
+		assert.deepEqual(data.blocks, [{ start: null, end: null }])
+		assert.equal(summary.isDoneForToday, true)
+	})
 })
