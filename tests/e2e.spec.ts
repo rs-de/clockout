@@ -26,6 +26,9 @@ async function setUpTracking(page: Page, password = "correct horse battery") {
 	await page.getByLabel("Repeat password").fill(password)
 	await page.getByRole("button", { name: "Save and start tracking" }).click()
 	await expect(page).toHaveURL(/\/d\//)
+	// A fresh day lands on the greeting landing screen first — dismiss it to
+	// reach the normal tracking view every other test/helper expects.
+	await page.getByRole("button", { name: "Start work" }).click()
 	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
 }
 
@@ -64,6 +67,33 @@ test("home page loads the setup form", async ({ page }) => {
 	await expect(
 		page.getByRole("button", { name: "Save and start tracking" }),
 	).toBeVisible()
+})
+
+test("a fresh day shows a greeting landing screen instead of jumping straight to tracking", async ({
+	page,
+}) => {
+	await page.goto("/")
+	await page
+		.getByLabel("Password", { exact: true })
+		.fill("correct horse battery")
+	await page.getByLabel("Repeat password").fill("correct horse battery")
+	await page.getByRole("button", { name: "Save and start tracking" }).click()
+	await expect(page).toHaveURL(/\/d\//)
+
+	await expect(page.getByText(/^(Good morning|Welcome back)$/)).toBeVisible()
+	await expect(page.getByRole("button", { name: "Start work" })).toBeVisible()
+	// Purely a dismiss — landing here doesn't itself start a block.
+	await expect(
+		page.getByRole("button", { name: "Start", exact: true }),
+	).toHaveCount(0)
+
+	await page.getByRole("button", { name: "Start work" }).click()
+	await expect(
+		page.getByRole("button", { name: "Start", exact: true }),
+	).toBeVisible()
+	await expect(page.locator('input[aria-label="Start"]').first()).toHaveValue(
+		"",
+	)
 })
 
 test("setup creates tracking data; Start persists a block across reload", async ({
@@ -218,6 +248,9 @@ test("a short day's booking time is topped up from the depot, capped at what's a
 	await bookingMinutes.fill("5")
 	await expect(page.getByText("Depot after booking: 0h 00m")).toBeVisible()
 	await page.getByRole("button", { name: "Book" }).click()
+	// Booking with nothing worked since the last reload lands on the "done
+	// for today" landing screen — dismiss it to see the depot stat again.
+	await page.getByRole("button", { name: "Back" }).click()
 	await expect(page.getByText("Depot: 0h 00m")).toBeVisible()
 })
 
@@ -274,6 +307,18 @@ test("an example can show the day already booked out, instead of a fresh quittin
 	await expect(stat).toHaveAttribute("data-done", "true")
 })
 
+test("an example can show a fresh morning greeting instead of jumping straight to tracking", async ({
+	page,
+}) => {
+	await page.goto("/example/next-morning")
+	await expect(page.getByText("Good morning")).toBeVisible()
+	await expect(page.getByRole("button", { name: "Start work" })).toBeVisible()
+	// Unlike the real app, an example that's about the greeting itself
+	// doesn't get skipStartLanding — but one like depot-credit still does.
+	await page.goto("/example/depot-credit")
+	await expect(page.getByText(/Quitting time: \d{2}:\d{2}/)).toBeVisible()
+})
+
 test("home shows a link to the existing doc, not the tracking screen directly", async ({
 	page,
 }) => {
@@ -294,6 +339,9 @@ test("home shows a link to the existing doc, not the tracking screen directly", 
 
 	await homeLink.click()
 	await expect(page).toHaveURL(docUrl)
+	// A fresh mount of the tracking screen lands on the greeting landing
+	// again — dismiss it the same way setUpTracking does.
+	await page.getByRole("button", { name: "Start work" }).click()
 	await expect(
 		page.getByRole("button", { name: /^(Start|Stop)$/ }),
 	).toBeVisible()
@@ -357,6 +405,9 @@ test("clearing local storage requires re-entering the password to unlock", async
 	await page.getByLabel("Password").fill("correct horse battery")
 	await page.getByRole("button", { name: "Unlock" }).click()
 	await expect(page).toHaveURL(docUrl)
+	// A fresh mount of the tracking screen lands on the greeting landing
+	// again — dismiss it the same way setUpTracking does.
+	await page.getByRole("button", { name: "Start work" }).click()
 	await expect(
 		page.getByRole("button", { name: /^(Start|Stop)$/ }),
 	).toBeVisible()
@@ -404,10 +455,13 @@ test("pre-rewrite local data (weekly target + event log, no blocks/bookings) sta
 	)
 
 	await page.goto(`/d/${id}`)
-	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
+	// The reset-to-fresh doc still lands on the greeting landing screen first.
+	await expect(page.getByRole("button", { name: "Start work" })).toBeVisible()
 	await expect(
 		page.getByText(
 			"This update couldn't carry over your history — starting fresh from today.",
 		),
 	).toBeVisible()
+	await page.getByRole("button", { name: "Start work" }).click()
+	await expect(page.getByRole("button", { name: "Start" })).toBeVisible()
 })

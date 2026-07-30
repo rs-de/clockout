@@ -177,4 +177,22 @@ describe("EXAMPLES", () => {
 		assert.deepEqual(data.blocks, [{ start: null, end: null }])
 		assert.equal(summary.isDoneForToday, true)
 	})
+
+	test("next-morning: a fresh, not-yet-started day, without skipStartLanding", () => {
+		const example = findExample("next-morning")
+		if (!example) throw new Error("expected the next-morning example to exist")
+
+		const data = buildExampleData(example, new Date(2026, 6, 15, 3, 0))
+
+		assert.deepEqual(data.blocks, [{ start: null, end: null }])
+		assert.deepEqual(data.bookings, [])
+		assert.equal(example.skipStartLanding, undefined)
+	})
+
+	test("depot-credit: opts out of the greeting landing via skipStartLanding", () => {
+		const example = findExample("depot-credit")
+		if (!example) throw new Error("expected the depot-credit example to exist")
+
+		assert.equal(example.skipStartLanding, true)
+	})
 })

@@ -11,6 +11,7 @@
 	--color-stop: #cf222e;
 	--color-stop-hover: #a91e28;
 	--color-warn: #9a6700;
+	--color-sun: #e8a300;
 	/* No Open Props step lands on 12px (scale jumps 8px -> 16px) — kept as a
 	   literal rather than forcing a nearby token onto a value it doesn't match. */
 	--space-3: 12px;
@@ -51,6 +52,7 @@
 		--color-bg: #0d1117;
 		--color-text: #e6edf3;
 		--color-warn: #e3b341;
+		--color-sun: #ffc94d;
 
 		--primary-1: 212 35% 9.2%;
 		--primary-2: 216 50% 11.8%;
@@ -568,6 +570,46 @@ select:disabled {
 	font-size: 1.0625rem;
 	font-weight: var(--font-weight-6);
 	color: hsl(var(--slate-12));
+}
+
+/* The "done for today" / "not started yet" landing screen, replacing the
+   normal time-stats + block-form + booking-form layout entirely. */
+.time-landing {
+	align-items: center;
+	justify-content: center;
+	gap: 1.75rem;
+	text-align: center;
+}
+
+.time-landing__visual {
+	color: hsl(var(--primary-9));
+}
+
+.time-landing__visual svg {
+	display: block;
+	width: 5.5rem;
+	height: 5.5rem;
+}
+
+.time-landing__visual--sun {
+	color: var(--color-sun);
+}
+
+/* Punches the crescent's shadow out of the moon disc — relies on this
+   sitting directly on the page background (not a tinted panel like
+   .time-stats) for the cutout to actually blend in. */
+.time-landing__visual-cutout {
+	fill: var(--color-bg);
+}
+
+.time-landing__headline {
+	white-space: normal;
+	overflow: visible;
+	text-overflow: unset;
+}
+
+.time-landing__action {
+	min-width: 12rem;
 }
 
 .booking-form {

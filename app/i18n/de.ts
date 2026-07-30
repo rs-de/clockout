@@ -5,6 +5,7 @@ export const de: Record<string, string> = {
 	"Add to your homescreen for quick access":
 		"Zum Startbildschirm hinzufügen für schnellen Zugriff",
 	"Already past quitting time": "Feierabend schon vorbei",
+	Back: "Zurück",
 	"Back to examples": "Zurück zu den Beispielen",
 	Book: "Buchen",
 	"Booked out for the day": "Feierabend gebucht",
@@ -27,6 +28,7 @@ export const de: Record<string, string> = {
 	Examples: "Beispiele",
 	"German (17.07.2026, 24h)": "Deutsch (17.07.2026, 24h)",
 	"Go to your time tracking": "Zu deiner Zeiterfassung",
+	"Good morning": "Guten Morgen",
 	"How dates and times are displayed throughout the app.":
 		"Wie Datum und Uhrzeit in der App angezeigt werden.",
 	"ISO 8601 (2026-07-17, 24h)": "ISO 8601 (2026-07-17, 24h)",
@@ -52,6 +54,7 @@ export const de: Record<string, string> = {
 		"Vergib ein Passwort, um deine Daten vor der Online-Synchronisierung zu verschlüsseln — nur du kannst sie entschlüsseln. Du brauchst es nur erneut, wenn der Browser Cache gelöscht wird oder du den Link zu deinem ClockOut auf einem andern Gerät öffnest. Empfehlung: Benutze einen Passwort Manager!",
 	Settings: "Einstellungen",
 	Start: "Start",
+	"Start work": "Arbeit beginnen",
 	Stop: "Stopp",
 	"Sync failed (offline?)": "Synchronisierung fehlgeschlagen (offline?)",
 	Synced: "Synchronisiert",
@@ -62,6 +65,7 @@ export const de: Record<string, string> = {
 		'Tippe auf •••, dann auf Teilen ⬆, dann auf "Zum Home-Bildschirm"',
 	"The most that can be booked in one day — extra time still credits the depot.":
 		"Das Maximum, das an einem Tag gebucht werden kann — die restliche Zeit fließt trotzdem ins Depot.",
+	"The next morning": "Der nächste Morgen",
 	"This browser doesn't have local data for this link.":
 		"Dieser Browser hat keine lokalen Daten für diesen Link.",
 	"This update couldn't carry over your history — starting fresh from today.":
@@ -70,6 +74,7 @@ export const de: Record<string, string> = {
 	"Used to calculate your quitting time and depot credit.":
 		"Wird verwendet, um deinen Feierabend und die Depot-Gutschrift zu berechnen.",
 	"View on Github": "Auf GitHub ansehen",
+	"Welcome back": "Willkommen zurück",
 	"Wrong password.": "Falsches Passwort.",
 	h: "h",
 	m: "min",

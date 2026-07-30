@@ -32,6 +32,12 @@ export type Example = {
 	 * `pretendNow` itself (see `buildExampleData`) — shows off the
 	 * "done for today" headline instead of a fresh quitting-time estimate. */
 	bookedToday?: boolean
+	/** Skips the "haven't started yet" greeting landing (app.tsx) even though
+	 * this example's blocks are empty — for an example whose whole point is
+	 * showing off a stat (e.g. depot-credit's banked overtime) the instant
+	 * it opens, rather than gating it behind a click. Examples that *are*
+	 * about that landing (next-morning) leave this unset. */
+	skipStartLanding?: boolean
 }
 
 // Ordered from the most ordinary case to the most edge-case-y, since this
@@ -55,6 +61,7 @@ export const EXAMPLES: Example[] = [
 		pretendTime: "08:00",
 		blocks: [],
 		depotSec: 3 * 60 * 60,
+		skipStartLanding: true,
 	},
 	{
 		id: "past-quitting-time",
@@ -72,6 +79,14 @@ export const EXAMPLES: Example[] = [
 		pretendTime: "23:50",
 		blocks: [],
 		bookedToday: true,
+	},
+	{
+		id: "next-morning",
+		title: "The next morning",
+		description:
+			"A fresh day that hasn't started yet — a morning greeting instead of jumping straight into a quitting-time countdown.",
+		pretendTime: "07:30",
+		blocks: [],
 	},
 ]
 

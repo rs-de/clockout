@@ -984,6 +984,7 @@ export const App = clientEntry(
 							<a href="/about">{t("Back to examples")}</a>
 						</p>
 					}
+					skipStartLanding={example.skipStartLanding}
 				/>
 			)
 		}
@@ -1002,9 +1003,19 @@ type TrackingScreenProps = {
 	t: Translator
 	banner?: RemixNode
 	footer?: RemixNode
+	/** Set from `Example.skipStartLanding` (examples.ts) — an example whose
+	 * point is a stat, not the landing itself (e.g. `depot-credit`), skips
+	 * the "haven't started yet" greeting so it shows that stat immediately. */
+	skipStartLanding?: boolean
 }
 
 function TrackingScreen(handle: Handle<TrackingScreenProps>) {
+	// Once dismissed (via the landing screen's Back/Start work button), stays
+	// dismissed for the rest of this component's lifetime — otherwise a quick
+	// Stop right after Start (discarded as too short, requirement #10) would
+	// re-show the landing screen the instant workedSec drops back to 0.
+	let dismissed = false
+
 	return () => {
 		const {
 			data,
@@ -1016,10 +1027,145 @@ function TrackingScreen(handle: Handle<TrackingScreenProps>) {
 			t,
 			banner,
 			footer,
+			skipStartLanding,
 		} = handle.props
 		const nowSec = Math.floor(now.getTime() / 1000)
 		const summary = summarize(data, now)
 		const dateFormat = data.settings.dateFormat
+
+		// A landing screen replaces the normal tracking view whenever there's
+		// nothing to actually show yet: either the day's already booked out
+		// (isDoneForToday), or tracking hasn't started at all today.
+		const notStartedYet =
+			!skipStartLanding &&
+			!summary.isDoneForToday &&
+			!summary.isRunning &&
+			summary.workedSec === 0
+		if (!dismissed && (summary.isDoneForToday || notStartedYet)) {
+			const isMorning = now.getHours() < 12
+			const greeting = summary.isDoneForToday
+				? t("Done for today — see you tomorrow!")
+				: isMorning
+					? t("Good morning")
+					: t("Welcome back")
+
+			return (
+				<div class="time-page time-landing">
+					{banner}
+					<div class="time-landing__visual">
+						{summary.isDoneForToday ? (
+							<svg viewBox="0 0 64 64" aria-hidden="true">
+								<circle cx="32" cy="32" r="20" fill="currentColor" />
+								<circle
+									cx="42"
+									cy="24"
+									r="17"
+									class="time-landing__visual-cutout"
+								/>
+								<path
+									d="M12 16l1.6 3.6L17 21l-3.4 1.4L12 26l-1.6-3.6L7 21l3.4-1.4L12 16Z"
+									fill="currentColor"
+								/>
+								<circle cx="50" cy="46" r="1.6" fill="currentColor" />
+							</svg>
+						) : isMorning ? (
+							<svg
+								viewBox="0 0 64 64"
+								fill="none"
+								aria-hidden="true"
+								class="time-landing__visual--sun"
+							>
+								<path d="M18 46A14 14 0 0 1 46 46Z" fill="currentColor" />
+								<path
+									d="M10 46h44"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+								<line
+									x1="32"
+									y1="12"
+									x2="32"
+									y2="20"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+								<line
+									x1="10"
+									y1="26"
+									x2="16"
+									y2="31"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+								<line
+									x1="54"
+									y1="26"
+									x2="48"
+									y2="31"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+							</svg>
+						) : (
+							<svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+								<rect
+									x="14"
+									y="28"
+									width="30"
+									height="24"
+									rx="6"
+									stroke="currentColor"
+									stroke-width="2"
+								/>
+								<path
+									d="M44 32h4a6 6 0 0 1 0 12h-4"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+								<path
+									d="M22 22c0-3 3-3 3-6s-3-3-3-6"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+								<path
+									d="M32 22c0-3 3-3 3-6s-3-3-3-6"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+							</svg>
+						)}
+					</div>
+					<p
+						class="time-stat time-stat--primary time-landing__headline"
+						data-done={summary.isDoneForToday}
+					>
+						{greeting}
+					</p>
+					<button
+						type="button"
+						class={
+							summary.isDoneForToday
+								? "btn btn-primary time-landing__action"
+								: "toggle-button time-landing__action"
+						}
+						mix={on("click", () => {
+							dismissed = true
+							handle.update()
+						})}
+					>
+						{summary.isDoneForToday ? t("Back") : t("Start work")}
+					</button>
+					{footer}
+				</div>
+			)
+		}
 
 		const defaultBookingMinutes = Math.round(summary.defaultBookingSec / 60)
 		const defaultBookingHours = Math.floor(defaultBookingMinutes / 60)
